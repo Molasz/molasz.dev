@@ -1,4 +1,6 @@
-import React from 'react'
+import React, { useState, useRef, useEffect } from 'react'
+import { useFrame } from '@react-three/fiber'
+import * as THREE from 'three'
 
 interface DeskLampProps {
   position?: [number, number, number]
@@ -11,76 +13,146 @@ export const DeskLamp: React.FC<DeskLampProps> = ({
   rotation = [0, 0, 0],
   scale = 1,
 }) => {
+  const [isOn, setIsOn] = useState(true)
+  const [hovered, setHovered] = useState(false)
+  const [recoil, setRecoil] = useState(0)
+
+  useEffect(() => {
+    document.body.style.cursor = hovered ? 'pointer' : 'auto'
+    return () => {
+      document.body.style.cursor = 'auto'
+    }
+  }, [hovered])
+
+  const headRef = useRef<THREE.Group>(null)
+  const recoilRef = useRef(0)
+
+  useFrame(() => {
+    recoilRef.current = THREE.MathUtils.lerp(recoilRef.current, recoil, 0.15)
+    if (headRef.current) {
+      headRef.current.rotation.x = 1.1 + recoilRef.current * 0.1
+    }
+    if (recoil > 0) setRecoil(0)
+  })
+
+  const toggleLamp = (e: { stopPropagation: () => void }) => {
+    e.stopPropagation()
+    setIsOn((prev) => !prev)
+    setRecoil(1)
+  }
+
   return (
-    <group position={position} rotation={rotation} scale={scale}>
-      {/* Table Edge Clamp Base */}
+    <group
+      position={position}
+      rotation={rotation}
+      scale={scale}
+      onClick={toggleLamp}
+      onPointerOver={(e) => {
+        e.stopPropagation()
+        setHovered(true)
+      }}
+      onPointerOut={() => setHovered(false)}
+    >
+      {/* Heavy C-Clamp Base with Hand Screw */}
       <mesh position={[0, 0.02, 0]} castShadow>
         <boxGeometry args={[0.06, 0.08, 0.06]} />
-        <meshStandardMaterial color="#1e293b" metalness={0.8} roughness={0.3} />
+        <meshStandardMaterial
+          color={hovered ? '#2d3748' : '#1e2430'}
+          metalness={0.6}
+          roughness={0.4}
+          flatShading
+        />
       </mesh>
-      {/* Swivel Pivot */}
+      {/* Brass Clamp Tightener Screw Under Table */}
+      <mesh position={[0, -0.03, 0]} castShadow>
+        <cylinderGeometry args={[0.005, 0.005, 0.03, 6]} />
+        <meshStandardMaterial color="#b5935b" metalness={0.8} roughness={0.3} flatShading />
+      </mesh>
+      <mesh position={[0, -0.045, 0]} castShadow>
+        <boxGeometry args={[0.024, 0.004, 0.012]} />
+        <meshStandardMaterial color="#b5935b" metalness={0.8} roughness={0.3} flatShading />
+      </mesh>
+
+      {/* Brass Swivel Joint */}
       <mesh position={[0, 0.07, 0]} castShadow>
-        <cylinderGeometry args={[0.015, 0.015, 0.04, 16]} />
-        <meshStandardMaterial color="#334155" metalness={0.9} roughness={0.2} />
+        <cylinderGeometry args={[0.015, 0.015, 0.04, 8]} />
+        <meshStandardMaterial color="#b5935b" metalness={0.8} roughness={0.3} flatShading />
       </mesh>
 
-      {/* Lower Arm (Angled) */}
+      {/* Articulated Lower Scissor Arms */}
       <group position={[0, 0.09, 0]} rotation={[0.4, 0.3, -0.4]}>
-        <mesh position={[-0.01, 0.18, 0]} castShadow>
-          <cylinderGeometry args={[0.005, 0.005, 0.38, 8]} />
-          <meshStandardMaterial color="#0284c7" roughness={0.4} metalness={0.6} />
+        <mesh position={[-0.012, 0.18, 0]} castShadow>
+          <cylinderGeometry args={[0.005, 0.005, 0.38, 6]} />
+          <meshStandardMaterial color="#2d4458" roughness={0.5} metalness={0.5} flatShading />
         </mesh>
-        <mesh position={[0.01, 0.18, 0]} castShadow>
-          <cylinderGeometry args={[0.005, 0.005, 0.38, 8]} />
-          <meshStandardMaterial color="#0284c7" roughness={0.4} metalness={0.6} />
+        <mesh position={[0.012, 0.18, 0]} castShadow>
+          <cylinderGeometry args={[0.005, 0.005, 0.38, 6]} />
+          <meshStandardMaterial color="#2d4458" roughness={0.5} metalness={0.5} flatShading />
         </mesh>
 
-        {/* Elbow Joint */}
+        {/* Brass Tension Spring Simulation */}
+        <mesh position={[0, 0.18, 0.008]} castShadow>
+          <cylinderGeometry args={[0.004, 0.004, 0.22, 6]} />
+          <meshStandardMaterial color="#b5935b" metalness={0.85} roughness={0.25} flatShading />
+        </mesh>
+
+        {/* Brass Elbow Joint */}
         <group position={[0, 0.38, 0]} rotation={[-0.8, -0.1, 0.6]}>
           <mesh castShadow>
-            <sphereGeometry args={[0.018, 16, 16]} />
-            <meshStandardMaterial color="#334155" metalness={0.8} />
+            <dodecahedronGeometry args={[0.018, 0]} />
+            <meshStandardMaterial color="#b5935b" metalness={0.8} flatShading />
           </mesh>
 
-          {/* Upper Arm */}
-          <mesh position={[-0.01, 0.16, 0]} castShadow>
-            <cylinderGeometry args={[0.005, 0.005, 0.34, 8]} />
-            <meshStandardMaterial color="#0284c7" roughness={0.4} metalness={0.6} />
+          {/* Upper Scissor Arms */}
+          <mesh position={[-0.012, 0.16, 0]} castShadow>
+            <cylinderGeometry args={[0.005, 0.005, 0.34, 6]} />
+            <meshStandardMaterial color="#2d4458" roughness={0.5} metalness={0.5} flatShading />
           </mesh>
-          <mesh position={[0.01, 0.16, 0]} castShadow>
-            <cylinderGeometry args={[0.005, 0.005, 0.34, 8]} />
-            <meshStandardMaterial color="#0284c7" roughness={0.4} metalness={0.6} />
+          <mesh position={[0.012, 0.16, 0]} castShadow>
+            <cylinderGeometry args={[0.005, 0.005, 0.34, 6]} />
+            <meshStandardMaterial color="#2d4458" roughness={0.5} metalness={0.5} flatShading />
           </mesh>
 
-          {/* Lamp Head Assembly */}
-          <group position={[0, 0.34, 0]} rotation={[1.1, 0, -0.4]}>
-            {/* Lamp Cone Shade */}
-            <mesh position={[0, 0.04, 0]} castShadow>
-              <coneGeometry args={[0.075, 0.1, 24, 1, true]} />
-              <meshStandardMaterial color="#1e293b" side={2} metalness={0.7} roughness={0.3} />
+          {/* Lamp Head, Reflector Dome & Rotary Switch */}
+          <group ref={headRef} position={[0, 0.34, 0]} rotation={[1.1, 0, -0.4]}>
+            {/* Top Rotary Switch Key */}
+            <mesh position={[0, 0.09, 0]} castShadow>
+              <cylinderGeometry args={[0.008, 0.008, 0.014, 6]} />
+              <meshStandardMaterial color="#b5935b" metalness={0.8} roughness={0.3} flatShading />
             </mesh>
 
-            {/* Glowing Bulb */}
-            <mesh position={[0, 0.02, 0]}>
-              <sphereGeometry args={[0.025, 16, 16]} />
+            {/* Dome Reflector Shade */}
+            <mesh position={[0, 0.04, 0]} castShadow>
+              <coneGeometry args={[0.075, 0.1, 8, 1, true]} />
               <meshStandardMaterial
-                color="#fef08a"
-                emissive="#fef08a"
-                emissiveIntensity={1.2}
+                color={hovered ? '#26303d' : '#1a222c'}
+                side={2}
+                metalness={0.6}
+                roughness={0.4}
+                flatShading
               />
             </mesh>
 
-            {/* Focused Desk Spotlight */}
-            <spotLight
-              position={[0, 0, 0]}
-              target-position={[0, -0.8, 0.3]}
-              intensity={2.8}
-              angle={0.6}
-              penumbra={0.4}
-              distance={2.5}
-              color="#fef3c7"
-              castShadow
-            />
+            {/* Bulb */}
+            <mesh position={[0, 0.02, 0]}>
+              <octahedronGeometry args={[0.022, 0]} />
+              <meshStandardMaterial
+                color={isOn ? '#fef3c7' : '#334155'}
+                emissive={isOn ? '#fef3c7' : '#000000'}
+                emissiveIntensity={isOn ? 1.2 : 0}
+                flatShading
+              />
+            </mesh>
+
+            {/* Warm Task Light */}
+            {isOn && (
+              <pointLight
+                position={[0, -0.02, 0]}
+                intensity={1.4}
+                distance={2.4}
+                color="#fde68a"
+              />
+            )}
           </group>
         </group>
       </group>

@@ -1,4 +1,5 @@
-import React, { useMemo } from 'react'
+import React, { useMemo, useState, useRef, useEffect } from 'react'
+import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 
 interface OscilloscopeProps {
@@ -12,167 +13,273 @@ export const Oscilloscope: React.FC<OscilloscopeProps> = ({
   rotation = [0, 0, 0],
   scale = 1,
 }) => {
-  const screenTexture = useMemo(() => {
-    const canvas = document.createElement('canvas')
-    canvas.width = 512
-    canvas.height = 340
-    const ctx = canvas.getContext('2d')
-    if (ctx) {
-      // Dark oscilloscope screen background
-      ctx.fillStyle = '#060d13'
-      ctx.fillRect(0, 0, 512, 340)
+  const [mode, setMode] = useState(0)
+  const [knobRot, setKnobRot] = useState(0)
+  const [hovered, setHovered] = useState(false)
 
-      // Oscilloscope graticule grid (8x10 divs)
-      ctx.strokeStyle = '#0f2938'
+  useEffect(() => {
+    document.body.style.cursor = hovered ? 'pointer' : 'auto'
+    return () => {
+      document.body.style.cursor = 'auto'
+    }
+  }, [hovered])
+
+  const timebaseKnobRef = useRef<THREE.Mesh>(null)
+  const ch1KnobRef = useRef<THREE.Mesh>(null)
+  const ch2KnobRef = useRef<THREE.Mesh>(null)
+  const currentKnobAngle = useRef(0)
+
+  const { ctx, screenTexture } = useMemo(() => {
+    const c = document.createElement('canvas')
+    c.width = 256
+    c.height = 160
+    const context = c.getContext('2d')
+    const tex = new THREE.CanvasTexture(c)
+    tex.minFilter = THREE.NearestFilter
+    tex.magFilter = THREE.NearestFilter
+    return { ctx: context, screenTexture: tex }
+  }, [])
+
+  const timeRef = useRef(0)
+  const lastUpdate = useRef(0)
+
+  useFrame((_, delta) => {
+    timeRef.current += delta
+
+    currentKnobAngle.current = THREE.MathUtils.lerp(currentKnobAngle.current, knobRot, 0.15)
+    if (timebaseKnobRef.current) timebaseKnobRef.current.rotation.y = currentKnobAngle.current
+    if (ch1KnobRef.current) ch1KnobRef.current.rotation.y = -currentKnobAngle.current * 0.8
+    if (ch2KnobRef.current) ch2KnobRef.current.rotation.y = currentKnobAngle.current * 1.2
+
+    if (ctx && timeRef.current - lastUpdate.current > 0.03) {
+      lastUpdate.current = timeRef.current
+      const t = timeRef.current
+
+      // Outer Wilds scientific CRT display
+      ctx.fillStyle = '#0a1018'
+      ctx.fillRect(0, 0, 256, 160)
+
+      // Graticule grid
+      ctx.strokeStyle = '#14202d'
       ctx.lineWidth = 1
-      for (let x = 0; x <= 512; x += 51.2) {
+      for (let x = 0; x <= 256; x += 32) {
         ctx.beginPath()
         ctx.moveTo(x, 0)
-        ctx.lineTo(x, 340)
+        ctx.lineTo(x, 160)
         ctx.stroke()
       }
-      for (let y = 0; y <= 340; y += 34) {
+      for (let y = 0; y <= 160; y += 20) {
         ctx.beginPath()
         ctx.moveTo(0, y)
-        ctx.lineTo(512, y)
+        ctx.lineTo(256, y)
         ctx.stroke()
       }
 
-      // Top Status Bar
-      ctx.fillStyle = '#10b981'
-      ctx.font = 'bold 12px monospace'
-      ctx.fillText('TRIG\'D  AUTO', 16, 20)
-      ctx.fillStyle = '#38bdf8'
-      ctx.fillText('M 2.00ms  1.00GSa/s', 150, 20)
-      ctx.fillStyle = '#facc15'
-      ctx.fillText('f = 10.000 kHz', 380, 20)
+      const modes = [
+        { name: '48.00 MHz', ch1: '1.00V', ch2: '3.30V' },
+        { name: 'SOLAR PK', ch1: '500mV', ch2: '1.80V' },
+        { name: 'HARMONIC', ch1: '2.00V', ch2: '5.00V' },
+        { name: 'BEACON', ch1: '3.30V', ch2: '3.30V' },
+      ]
+      const curMode = modes[mode % modes.length]
 
-      // Waveform 1: Yellow Sine Wave (CH1)
-      ctx.strokeStyle = '#facc15'
-      ctx.lineWidth = 2.5
+      ctx.fillStyle = '#10b981'
+      ctx.font = 'bold 9px monospace'
+      ctx.fillText(`SIGNAL SCOPE: ${curMode.name}`, 10, 12)
+
+      // CH1 Waveform (Amber Ember)
+      ctx.strokeStyle = '#d97706'
+      ctx.lineWidth = 2
       ctx.beginPath()
-      for (let px = 0; px <= 512; px++) {
-        const py = 150 + Math.sin(px * 0.04) * 65
+      for (let px = 0; px <= 256; px += 3) {
+        let py = 68
+        if (mode === 0) {
+          py += Math.sin(px * 0.06 - t * 6) * 30
+        } else if (mode === 1) {
+          py += Math.sin(px * 0.18 - t * 14) * 24
+        } else if (mode === 2) {
+          const phase = ((px * 0.04 - t * 4) % 2 + 2) % 2
+          py += (phase < 1 ? phase * 2 - 1 : (2 - phase) * 2 - 1) * 32
+        } else {
+          py += Math.sin(px * 0.04 - t * 4) * Math.cos(px * 0.12 - t * 8) * 32
+        }
+
         if (px === 0) ctx.moveTo(px, py)
         else ctx.lineTo(px, py)
       }
       ctx.stroke()
 
-      // Waveform 2: Cyan Square / Clock Wave (CH2)
-      ctx.strokeStyle = '#06b6d4'
-      ctx.lineWidth = 2
+      // CH2 Waveform (Cyan Starfield)
+      ctx.strokeStyle = '#0d9488'
+      ctx.lineWidth = 1.8
       ctx.beginPath()
-      for (let px = 0; px <= 512; px++) {
-        const cycle = Math.floor(px / 32) % 2
-        const py = 240 + (cycle === 0 ? -35 : 35)
-        if (px === 0) ctx.moveTo(px, py)
-        else {
-          ctx.lineTo(px, py)
+      for (let px = 0; px <= 256; px += 2) {
+        let py = 120
+        if (mode === 0 || mode === 1) {
+          const cycle = Math.floor((px - t * 60) / 24) % 2
+          py += (cycle === 0 ? -18 : 18)
+        } else if (mode === 2) {
+          py += Math.sin(px * 0.08 - t * 8) * 20
+        } else {
+          const saw = ((px * 0.03 - t * 3) % 1 + 1) % 1
+          py += (saw * 2 - 1) * 20
         }
+
+        if (px === 0) ctx.moveTo(px, py)
+        else ctx.lineTo(px, py)
       }
       ctx.stroke()
 
-      // Bottom Channel Info Badges
-      ctx.fillStyle = '#facc15'
-      ctx.fillRect(16, 310, 60, 20)
-      ctx.fillStyle = '#000000'
-      ctx.font = 'bold 11px monospace'
-      ctx.fillText('1 1.00V', 22, 324)
+      // Badges
+      ctx.fillStyle = '#9a3412'
+      ctx.fillRect(8, 144, 46, 12)
+      ctx.fillStyle = '#ffffff'
+      ctx.font = 'bold 8px monospace'
+      ctx.fillText(`1 ${curMode.ch1}`, 12, 153)
 
-      ctx.fillStyle = '#06b6d4'
-      ctx.fillRect(86, 310, 60, 20)
-      ctx.fillStyle = '#000000'
-      ctx.fillText('2 3.30V', 92, 324)
+      ctx.fillStyle = '#1b4d3e'
+      ctx.fillRect(58, 144, 46, 12)
+      ctx.fillStyle = '#ffffff'
+      ctx.fillText(`2 ${curMode.ch2}`, 62, 153)
+
+      screenTexture.needsUpdate = true
     }
+  })
 
-    const texture = new THREE.CanvasTexture(canvas)
-    texture.minFilter = THREE.LinearFilter
-    return texture
-  }, [])
+  const handleClick = (e: { stopPropagation: () => void }) => {
+    e.stopPropagation()
+    setMode((prev) => (prev + 1) % 4)
+    setKnobRot((prev) => prev + Math.PI / 4)
+  }
 
   const width = 0.38
   const height = 0.22
   const depth = 0.16
 
   return (
-    <group position={position} rotation={rotation} scale={scale}>
-      {/* Main Enclosure Body */}
+    <group
+      position={position}
+      rotation={rotation}
+      scale={scale}
+      onClick={handleClick}
+      onPointerOver={(e) => {
+        e.stopPropagation()
+        setHovered(true)
+      }}
+      onPointerOut={() => setHovered(false)}
+    >
+      {/* Outer Enclosure (Parchment Stoneware Finish with Ventilation Louvers) */}
       <mesh position={[0, height / 2, 0]} castShadow receiveShadow>
         <boxGeometry args={[width, height, depth]} />
-        <meshStandardMaterial color="#e2e8f0" roughness={0.4} metalness={0.1} />
+        <meshStandardMaterial
+          color={hovered ? '#e5dfd2' : '#d8d2c4'}
+          roughness={0.55}
+          metalness={0.1}
+          flatShading
+        />
       </mesh>
 
-      {/* Front Bezel Frame (Dark Grey) */}
-      <mesh position={[0, height / 2, depth / 2 + 0.005]} castShadow>
-        <boxGeometry args={[width - 0.01, height - 0.01, 0.01]} />
-        <meshStandardMaterial color="#1e293b" roughness={0.6} />
-      </mesh>
+      {/* Top Leather / Brass Carrying Handle */}
+      <group position={[0, height + 0.012, 0]}>
+        <mesh castShadow>
+          <boxGeometry args={[0.16, 0.008, 0.02]} />
+          <meshStandardMaterial color="#78350f" roughness={0.8} flatShading />
+        </mesh>
+        <mesh position={[-0.075, -0.006, 0]} castShadow>
+          <cylinderGeometry args={[0.005, 0.005, 0.014, 6]} />
+          <meshStandardMaterial color="#b5935b" metalness={0.85} roughness={0.25} flatShading />
+        </mesh>
+        <mesh position={[0.075, -0.006, 0]} castShadow>
+          <cylinderGeometry args={[0.005, 0.005, 0.014, 6]} />
+          <meshStandardMaterial color="#b5935b" metalness={0.85} roughness={0.25} flatShading />
+        </mesh>
+      </group>
 
-      {/* TFT Display */}
-      <mesh position={[-0.05, height / 2 + 0.01, depth / 2 + 0.011]}>
-        <planeGeometry args={[0.22, 0.15]} />
-        <meshBasicMaterial map={screenTexture} />
-      </mesh>
-
-      {/* Side Handle / Rubber Bumpers */}
-      <mesh position={[-width / 2 - 0.005, height / 2, 0]} castShadow>
-        <boxGeometry args={[0.015, height + 0.01, depth + 0.01]} />
-        <meshStandardMaterial color="#0284c7" roughness={0.7} />
-      </mesh>
-      <mesh position={[width / 2 + 0.005, height / 2, 0]} castShadow>
-        <boxGeometry args={[0.015, height + 0.01, depth + 0.01]} />
-        <meshStandardMaterial color="#0284c7" roughness={0.7} />
-      </mesh>
-
-      {/* Rotary Knobs Area on Right Side */}
-      {/* Large Timebase Dial */}
-      <mesh
-        position={[0.11, height / 2 + 0.045, depth / 2 + 0.02]}
-        rotation={[Math.PI / 2, 0, 0]}
-        castShadow
-      >
-        <cylinderGeometry args={[0.016, 0.016, 0.018, 24]} />
-        <meshStandardMaterial color="#334155" metalness={0.7} roughness={0.3} />
-      </mesh>
-      {/* CH1 Knob (Yellow) */}
-      <mesh
-        position={[0.08, height / 2 - 0.01, depth / 2 + 0.02]}
-        rotation={[Math.PI / 2, 0, 0]}
-        castShadow
-      >
-        <cylinderGeometry args={[0.012, 0.012, 0.016, 20]} />
-        <meshStandardMaterial color="#facc15" roughness={0.4} />
-      </mesh>
-      {/* CH2 Knob (Cyan) */}
-      <mesh
-        position={[0.13, height / 2 - 0.01, depth / 2 + 0.02]}
-        rotation={[Math.PI / 2, 0, 0]}
-        castShadow
-      >
-        <cylinderGeometry args={[0.012, 0.012, 0.016, 20]} />
-        <meshStandardMaterial color="#06b6d4" roughness={0.4} />
-      </mesh>
-
-      {/* BNC Channel Inputs along bottom right */}
-      {[-0.03, 0.02, 0.07, 0.12].map((bx, idx) => (
-        <group key={idx} position={[bx, 0.035, depth / 2 + 0.018]}>
-          <mesh rotation={[Math.PI / 2, 0, 0]} castShadow>
-            <cylinderGeometry args={[0.008, 0.008, 0.015, 16]} />
-            <meshStandardMaterial color="#d1d5db" metalness={0.9} roughness={0.2} />
+      {/* Side Ventilation Slots */}
+      {[-0.04, -0.02, 0, 0.02, 0.04].map((ly, idx) => (
+        <group key={`louver-${idx}`}>
+          <mesh position={[-width / 2 - 0.0005, height / 2 + ly, 0]}>
+            <boxGeometry args={[0.001, 0.005, 0.08]} />
+            <meshStandardMaterial color="#1a222d" roughness={0.9} flatShading />
+          </mesh>
+          <mesh position={[width / 2 + 0.0005, height / 2 + ly, 0]}>
+            <boxGeometry args={[0.001, 0.005, 0.08]} />
+            <meshStandardMaterial color="#1a222d" roughness={0.9} flatShading />
           </mesh>
         </group>
       ))}
 
-      {/* Power Button with LED */}
-      <mesh position={[-0.14, height - 0.03, depth / 2 + 0.012]}>
-        <circleGeometry args={[0.008, 16]} />
-        <meshStandardMaterial color="#22c55e" emissive="#22c55e" emissiveIntensity={0.8} />
+      {/* Front Bezel Frame */}
+      <mesh position={[0, height / 2, depth / 2 + 0.005]} castShadow>
+        <boxGeometry args={[width - 0.015, height - 0.015, 0.01]} />
+        <meshStandardMaterial color="#1e2632" roughness={0.7} flatShading />
       </mesh>
 
-      {/* Probe Lead Cable attached to CH1 */}
-      <mesh position={[-0.03, 0.02, depth / 2 + 0.08]} rotation={[0.6, 0.3, 0]}>
-        <cylinderGeometry args={[0.004, 0.004, 0.12, 8]} />
-        <meshStandardMaterial color="#111827" roughness={0.8} />
+      {/* TFT Display Panel */}
+      <mesh position={[-0.05, height / 2 + 0.01, depth / 2 + 0.011]}>
+        <planeGeometry args={[0.22, 0.15]} />
+        <meshBasicMaterial map={screenTexture} toneMapped={false} />
+      </mesh>
+
+      {/* Side Protective Armor Bumpers */}
+      <mesh position={[-width / 2 - 0.004, height / 2, 0]} castShadow>
+        <boxGeometry args={[0.012, height + 0.01, depth + 0.01]} />
+        <meshStandardMaterial color="#2d3d4e" roughness={0.65} flatShading />
+      </mesh>
+      <mesh position={[width / 2 + 0.004, height / 2, 0]} castShadow>
+        <boxGeometry args={[0.012, height + 0.01, depth + 0.01]} />
+        <meshStandardMaterial color="#2d3d4e" roughness={0.65} flatShading />
+      </mesh>
+
+      {/* Animated Timebase Dial (Knurled Brass) */}
+      <mesh
+        ref={timebaseKnobRef}
+        position={[0.11, height / 2 + 0.045, depth / 2 + 0.02]}
+        rotation={[Math.PI / 2, 0, 0]}
+        castShadow
+      >
+        <cylinderGeometry args={[0.016, 0.016, 0.018, 8]} />
+        <meshStandardMaterial color="#b5935b" metalness={0.8} roughness={0.3} flatShading />
+      </mesh>
+
+      {/* Channel Knobs with Indicator Pointers */}
+      <mesh
+        ref={ch1KnobRef}
+        position={[0.08, height / 2 - 0.01, depth / 2 + 0.02]}
+        rotation={[Math.PI / 2, 0, 0]}
+        castShadow
+      >
+        <cylinderGeometry args={[0.012, 0.012, 0.016, 8]} />
+        <meshStandardMaterial color="#9a3412" roughness={0.45} flatShading />
+      </mesh>
+      <mesh
+        ref={ch2KnobRef}
+        position={[0.13, height / 2 - 0.01, depth / 2 + 0.02]}
+        rotation={[Math.PI / 2, 0, 0]}
+        castShadow
+      >
+        <cylinderGeometry args={[0.012, 0.012, 0.016, 8]} />
+        <meshStandardMaterial color="#1b4d3e" roughness={0.45} flatShading />
+      </mesh>
+
+      {/* 4 Brass BNC Channel Inputs with Bayonet Pins */}
+      {[-0.03, 0.02, 0.07, 0.12].map((bx, idx) => (
+        <group key={idx} position={[bx, 0.035, depth / 2 + 0.016]}>
+          <mesh rotation={[Math.PI / 2, 0, 0]} castShadow>
+            <cylinderGeometry args={[0.008, 0.008, 0.012, 8]} />
+            <meshStandardMaterial color="#c29b53" metalness={0.85} roughness={0.25} flatShading />
+          </mesh>
+          <mesh position={[0, 0, 0.006]}>
+            <cylinderGeometry args={[0.003, 0.003, 0.002, 6]} />
+            <meshStandardMaterial color="#1e2430" roughness={0.8} flatShading />
+          </mesh>
+        </group>
+      ))}
+
+      {/* Power Indicator LED */}
+      <mesh position={[-0.14, height - 0.03, depth / 2 + 0.012]}>
+        <boxGeometry args={[0.01, 0.01, 0.002]} />
+        <meshStandardMaterial color="#059669" emissive="#047857" emissiveIntensity={0.6} />
       </mesh>
     </group>
   )

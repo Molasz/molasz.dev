@@ -1,38 +1,47 @@
-import React from 'react'
+import React, { useMemo } from 'react'
 import { Grid, ContactShadows } from '@react-three/drei'
+import { getFloorTexture } from '../../utils/textures'
 
 export const Environment: React.FC = () => {
+  const floorTexture = useMemo(() => getFloorTexture(), [])
+
   return (
     <>
-      {/* Workshop Concrete Floor */}
+      {/* Studio Floor with Seamless Low-Poly Flagstone */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.001, 0]} receiveShadow>
         <planeGeometry args={[30, 30]} />
-        <meshStandardMaterial color="#0f172a" roughness={0.8} metalness={0.2} />
+        <meshStandardMaterial
+          map={floorTexture}
+          color="#161d28"
+          roughness={0.9}
+          metalness={0.1}
+          flatShading
+        />
       </mesh>
 
-      {/* Subtle Technical Floor Grid */}
+      {/* Soft Ambient Technical Floor Grid (Wide spacing, no shimmering) */}
       <Grid
         position={[0, 0, 0]}
         args={[30, 30]}
-        cellSize={0.5}
-        cellThickness={0.6}
-        cellColor="#1e293b"
-        sectionSize={2.5}
-        sectionThickness={1.2}
-        sectionColor="#334155"
-        fadeDistance={20}
-        fadeStrength={1.5}
+        cellSize={1.0}
+        cellThickness={0.4}
+        cellColor="#1c2533"
+        sectionSize={4.0}
+        sectionThickness={0.8}
+        sectionColor="#253244"
+        fadeDistance={18}
+        fadeStrength={1.8}
       />
 
-      {/* Realistic Ground Contact Shadows */}
+      {/* Soft Contact Shadows Under Table & Legs */}
       <ContactShadows
         position={[0, 0, 0]}
-        opacity={0.75}
-        scale={10}
-        blur={2}
-        far={4}
+        opacity={0.6}
+        scale={8.5}
+        blur={2.0}
+        far={3.5}
         resolution={1024}
-        color="#000000"
+        color="#04070c"
       />
     </>
   )

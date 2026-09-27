@@ -3,42 +3,39 @@ import React from 'react'
 export const Lighting: React.FC = () => {
   return (
     <>
-      <ambientLight intensity={0.7} color="#f1f5f9" />
+      {/* Neutral Balanced Ambient Light */}
+      <ambientLight intensity={0.7} color="#dbeafe" />
 
       {/* Main Studio Key Light */}
       <directionalLight
-        position={[4, 6, 4]}
-        intensity={1.5}
+        position={[3.5, 5, 3]}
+        intensity={1.4}
         castShadow
-        shadow-mapSize-width={2048}
-        shadow-mapSize-height={2048}
-        shadow-bias={-0.0001}
+        shadow-mapSize-width={1024}
+        shadow-mapSize-height={1024}
+        shadow-bias={-0.0002}
         shadow-camera-near={0.5}
-        shadow-camera-far={20}
-        shadow-camera-left={-3}
-        shadow-camera-right={3}
-        shadow-camera-top={3}
-        shadow-camera-bottom={-3}
-        color="#ffffff"
+        shadow-camera-far={12}
+        shadow-camera-left={-2}
+        shadow-camera-right={2}
+        shadow-camera-top={2}
+        shadow-camera-bottom={-2}
+        color="#fefefe"
       />
 
-      {/* Workbench Overhead Luminaire Light */}
-      <spotLight
-        position={[0, 1.7, -0.2]}
-        target-position={[0, 0.85, 0.05]}
-        angle={1.0}
-        penumbra={0.5}
-        intensity={3.0}
-        distance={3.5}
-        color="#ffffff"
-        castShadow
+      {/* Overhead Luminaire Light */}
+      <pointLight
+        position={[0, 1.6, -0.1]}
+        intensity={0.9}
+        distance={2.8}
+        color="#f8fafc"
       />
 
-      {/* Warm Fill Light */}
-      <pointLight position={[-2.5, 1.8, 1.5]} intensity={0.5} color="#fed7aa" />
+      {/* Soft Warm Side Fill Light */}
+      <pointLight position={[-2, 1.3, 1.2]} intensity={0.35} color="#fed7aa" />
 
-      {/* Cool Rim Accent Light */}
-      <pointLight position={[2.5, 2.2, -2]} intensity={0.8} color="#60a5fa" />
+      {/* Soft Cool Rim Light */}
+      <pointLight position={[2, 1.6, -1.5]} intensity={0.45} color="#93c5fd" />
     </>
   )
 }

@@ -1,4 +1,6 @@
-import React from 'react'
+import React, { useState, useRef, useEffect } from 'react'
+import { useFrame } from '@react-three/fiber'
+import * as THREE from 'three'
 
 interface SolderingStationProps {
   position?: [number, number, number]
@@ -6,122 +8,191 @@ interface SolderingStationProps {
   scale?: number
 }
 
+const TEMPS = ['350 °C', '380 °C', '420 °C', 'STBY']
+
 export const SolderingStation: React.FC<SolderingStationProps> = ({
   position = [0, 0, 0],
   rotation = [0, 0, 0],
   scale = 1,
 }) => {
+  const [tempIndex, setTempIndex] = useState(0)
+  const [isLifted, setIsLifted] = useState(false)
+  const [hovered, setHovered] = useState(false)
+
+  useEffect(() => {
+    document.body.style.cursor = hovered ? 'pointer' : 'auto'
+    return () => {
+      document.body.style.cursor = 'auto'
+    }
+  }, [hovered])
+
+  const ironGroupRef = useRef<THREE.Group>(null)
+  const ironLift = useRef(0)
+
+  useFrame(() => {
+    const targetLift = isLifted ? 0.04 : 0
+    ironLift.current = THREE.MathUtils.lerp(ironLift.current, targetLift, 0.12)
+    if (ironGroupRef.current) {
+      ironGroupRef.current.position.y = 0.03 + ironLift.current
+      ironGroupRef.current.position.z = -ironLift.current * 0.5
+    }
+  })
+
+  const tempTexture = React.useMemo(() => {
+    const c = document.createElement('canvas')
+    c.width = 128
+    c.height = 36
+    const ctx = c.getContext('2d')
+    if (ctx) {
+      ctx.fillStyle = '#0c1017'
+      ctx.fillRect(0, 0, 128, 36)
+      ctx.fillStyle = '#38bdf8'
+      ctx.font = 'bold 20px monospace'
+      ctx.fillText(TEMPS[tempIndex], 16, 26)
+    }
+    const tex = new THREE.CanvasTexture(c)
+    return tex
+  }, [tempIndex])
+
+  const handleClick = (e: { stopPropagation: () => void }) => {
+    e.stopPropagation()
+    setTempIndex((prev) => (prev + 1) % TEMPS.length)
+    setIsLifted((prev) => !prev)
+  }
+
   return (
-    <group position={position} rotation={rotation} scale={scale}>
-      {/* Main Base Unit */}
+    <group
+      position={position}
+      rotation={rotation}
+      scale={scale}
+      onClick={handleClick}
+      onPointerOver={(e) => {
+        e.stopPropagation()
+        setHovered(true)
+      }}
+      onPointerOut={() => setHovered(false)}
+    >
+      {/* Forged Slate Station Base Unit */}
       <group position={[0, 0, 0]}>
         <mesh position={[0, 0.05, 0]} castShadow receiveShadow>
           <boxGeometry args={[0.16, 0.1, 0.18]} />
-          <meshStandardMaterial color="#0284c7" roughness={0.5} metalness={0.2} />
+          <meshStandardMaterial
+            color={hovered ? '#354152' : '#28323f'}
+            roughness={0.65}
+            metalness={0.3}
+            flatShading
+          />
         </mesh>
 
-        {/* Front Dark Bezel */}
+        {/* Heat dissipation vents on sides */}
+        {[-0.02, 0, 0.02].map((sy, sIdx) => (
+          <mesh key={`sol-vent-${sIdx}`} position={[-0.0805, 0.05 + sy, 0]}>
+            <boxGeometry args={[0.001, 0.006, 0.08]} />
+            <meshStandardMaterial color="#141922" roughness={0.9} flatShading />
+          </mesh>
+        ))}
+
+        {/* Front Bezel */}
         <mesh position={[0, 0.05, 0.091]} castShadow>
-          <boxGeometry args={[0.15, 0.09, 0.005]} />
-          <meshStandardMaterial color="#0f172a" roughness={0.8} />
+          <boxGeometry args={[0.145, 0.088, 0.005]} />
+          <meshStandardMaterial color="#141a22" roughness={0.8} flatShading />
         </mesh>
 
-        {/* Digital Temp Display (350 C) */}
+        {/* Digital Temp Display */}
         <mesh position={[0, 0.065, 0.094]}>
-          <planeGeometry args={[0.08, 0.025]} />
-          <meshBasicMaterial color="#38bdf8" />
+          <planeGeometry args={[0.085, 0.026]} />
+          <meshBasicMaterial map={tempTexture} />
         </mesh>
 
-        {/* Up / Down Temp Buttons */}
+        {/* Brass Temp Buttons */}
         <mesh position={[-0.03, 0.028, 0.095]} rotation={[Math.PI / 2, 0, 0]} castShadow>
-          <cylinderGeometry args={[0.007, 0.007, 0.008, 16]} />
-          <meshStandardMaterial color="#f8fafc" roughness={0.4} />
+          <cylinderGeometry args={[0.007, 0.007, 0.008, 6]} />
+          <meshStandardMaterial color="#b5935b" metalness={0.8} roughness={0.3} flatShading />
         </mesh>
         <mesh position={[0.03, 0.028, 0.095]} rotation={[Math.PI / 2, 0, 0]} castShadow>
-          <cylinderGeometry args={[0.007, 0.007, 0.008, 16]} />
-          <meshStandardMaterial color="#f8fafc" roughness={0.4} />
+          <cylinderGeometry args={[0.007, 0.007, 0.008, 6]} />
+          <meshStandardMaterial color="#b5935b" metalness={0.8} roughness={0.3} flatShading />
         </mesh>
       </group>
 
-      {/* Soldering Iron Stand with Brass Tip Cleaner */}
+      {/* Soldering Iron Stand with Heat Shield */}
       <group position={[0.16, 0, 0.02]}>
-        {/* Heavy Iron Stand Base */}
         <mesh position={[0, 0.02, 0]} castShadow receiveShadow>
           <boxGeometry args={[0.12, 0.04, 0.16]} />
-          <meshStandardMaterial color="#334155" roughness={0.6} metalness={0.4} />
+          <meshStandardMaterial color="#212832" roughness={0.7} metalness={0.3} flatShading />
         </mesh>
 
-        {/* Angled Spring Holder Tube */}
+        {/* Angled Brass Spring Cradle */}
         <group position={[0, 0.04, -0.02]} rotation={[-0.6, 0, 0]}>
           <mesh castShadow>
-            <cylinderGeometry args={[0.022, 0.025, 0.12, 16, 1, true]} />
+            <cylinderGeometry args={[0.022, 0.025, 0.12, 8, 1, true]} />
             <meshStandardMaterial
-              color="#cbd5e1"
-              metalness={0.9}
-              roughness={0.2}
+              color="#b5935b"
+              metalness={0.75}
+              roughness={0.35}
               side={2}
+              flatShading
             />
           </mesh>
 
-          {/* Soldering Iron inside Stand */}
-          <group position={[0, 0.03, 0]}>
-            {/* Handle */}
+          {/* Soldering Iron with Ergonomic Grip */}
+          <group ref={ironGroupRef} position={[0, 0.03, 0]}>
+            {/* Ribbed Grip Handle */}
             <mesh position={[0, 0.08, 0]} castShadow>
-              <cylinderGeometry args={[0.012, 0.015, 0.14, 16]} />
-              <meshStandardMaterial color="#0284c7" roughness={0.6} />
+              <cylinderGeometry args={[0.012, 0.015, 0.14, 8]} />
+              <meshStandardMaterial color="#2d4458" roughness={0.6} flatShading />
             </mesh>
-            {/* Metal Collar */}
+            {/* Silicone Heat Collar */}
+            <mesh position={[0, 0.02, 0]} castShadow>
+              <cylinderGeometry args={[0.013, 0.013, 0.012, 8]} />
+              <meshStandardMaterial color="#9a3412" roughness={0.7} flatShading />
+            </mesh>
+            {/* Chrome Barrel */}
             <mesh position={[0, -0.01, 0]} castShadow>
-              <cylinderGeometry args={[0.008, 0.008, 0.04, 16]} />
-              <meshStandardMaterial color="#94a3b8" metalness={0.9} roughness={0.2} />
+              <cylinderGeometry args={[0.008, 0.008, 0.04, 8]} />
+              <meshStandardMaterial color="#cbd5e1" metalness={0.9} roughness={0.2} flatShading />
             </mesh>
-            {/* Glowing Soldering Tip */}
+            {/* Hot Tip Ember */}
             <mesh position={[0, -0.04, 0]} rotation={[Math.PI, 0, 0]}>
-              <coneGeometry args={[0.004, 0.025, 16]} />
+              <coneGeometry args={[0.004, 0.025, 8]} />
               <meshStandardMaterial
                 color="#ea580c"
                 emissive="#f97316"
-                emissiveIntensity={0.6}
-                metalness={0.8}
-                roughness={0.2}
+                emissiveIntensity={isLifted ? 1.5 : 0.7}
+                metalness={0.7}
+                roughness={0.3}
+                flatShading
               />
             </mesh>
           </group>
         </group>
 
-        {/* Brass Wire Sponge Cup */}
+        {/* Brass Cleaner Pot with Golden Wire Curls */}
         <group position={[0, 0.04, 0.04]}>
           <mesh castShadow>
-            <cylinderGeometry args={[0.025, 0.022, 0.02, 20]} />
-            <meshStandardMaterial color="#1e293b" roughness={0.5} />
+            <cylinderGeometry args={[0.025, 0.022, 0.02, 8]} />
+            <meshStandardMaterial color="#171e27" roughness={0.6} flatShading />
           </mesh>
-          {/* Golden Brass Curls */}
           <mesh position={[0, 0.012, 0]}>
-            <sphereGeometry args={[0.02, 16, 16]} />
-            <meshStandardMaterial color="#ca8a04" metalness={0.8} roughness={0.5} />
+            <dodecahedronGeometry args={[0.016, 0]} />
+            <meshStandardMaterial color="#c29b53" metalness={0.75} roughness={0.45} flatShading />
           </mesh>
         </group>
       </group>
 
-      {/* Solder Wire Spool Holder */}
+      {/* Solder Spool with Brass Weighted Stand */}
       <group position={[-0.14, 0, 0.02]}>
         <mesh position={[0, 0.035, 0]} rotation={[0, 0, Math.PI / 2]} castShadow>
-          <cylinderGeometry args={[0.035, 0.035, 0.05, 24]} />
-          <meshStandardMaterial color="#cbd5e1" metalness={0.85} roughness={0.3} />
+          <cylinderGeometry args={[0.035, 0.035, 0.05, 8]} />
+          <meshStandardMaterial color="#cbd5e1" metalness={0.85} roughness={0.3} flatShading />
         </mesh>
-        {/* Spool Plastic Flanges */}
         <mesh position={[-0.027, 0.035, 0]} rotation={[0, 0, Math.PI / 2]} castShadow>
-          <cylinderGeometry args={[0.045, 0.045, 0.006, 24]} />
-          <meshStandardMaterial color="#0284c7" roughness={0.5} />
+          <cylinderGeometry args={[0.045, 0.045, 0.006, 8]} />
+          <meshStandardMaterial color="#2d4458" roughness={0.6} flatShading />
         </mesh>
         <mesh position={[0.027, 0.035, 0]} rotation={[0, 0, Math.PI / 2]} castShadow>
-          <cylinderGeometry args={[0.045, 0.045, 0.006, 24]} />
-          <meshStandardMaterial color="#0284c7" roughness={0.5} />
-        </mesh>
-        {/* Wire hanging out onto desk */}
-        <mesh position={[0.02, 0.01, 0.04]} rotation={[0.4, 0.2, 0]}>
-          <cylinderGeometry args={[0.0015, 0.0015, 0.07, 8]} />
-          <meshStandardMaterial color="#e2e8f0" metalness={0.9} roughness={0.2} />
+          <cylinderGeometry args={[0.045, 0.045, 0.006, 8]} />
+          <meshStandardMaterial color="#2d4458" roughness={0.6} flatShading />
         </mesh>
       </group>
     </group>

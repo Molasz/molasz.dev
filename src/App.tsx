@@ -7,10 +7,10 @@ export const App: React.FC = () => {
   const [currentView, setCurrentView] = useState<ViewPreset>('overview')
 
   return (
-    <main className="relative w-screen h-screen overflow-hidden bg-slate-950">
-      <Overlay currentView={currentView} onSelectView={setCurrentView} />
+    <div className="relative w-full h-full overflow-hidden bg-[#0a0e17]">
       <Scene view={currentView} />
-    </main>
+      <Overlay currentView={currentView} onSelectView={setCurrentView} />
+    </div>
   )
 }
 
