@@ -1,11 +1,9 @@
 import React, { useMemo, useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
-import type { LightingTheme } from '../../types/lab'
 
 interface DustParticlesProps {
   count?: number
-  theme?: LightingTheme
 }
 
 function generateInitialParticles(count: number): [Float32Array, Float32Array] {
@@ -30,25 +28,12 @@ function generateInitialParticles(count: number): [Float32Array, Float32Array] {
   return [pos, spd]
 }
 
-export const DustParticles: React.FC<DustParticlesProps> = ({ count = 65, theme = 'cyber' }) => {
+export const DustParticles: React.FC<DustParticlesProps> = ({ count = 65 }) => {
   const pointsRef = useRef<THREE.Points>(null)
 
   const [positions, speeds] = useMemo(() => {
     return generateInitialParticles(count)
   }, [count])
-
-  const particleColor = useMemo(() => {
-    switch (theme) {
-      case 'warm':
-        return '#fde68a'
-      case 'clean':
-        return '#bae6fd'
-      case 'matrix':
-        return '#86efac'
-      default:
-        return '#7dd3fc'
-    }
-  }, [theme])
 
   useFrame((_, delta) => {
     if (!pointsRef.current) return
@@ -79,7 +64,7 @@ export const DustParticles: React.FC<DustParticlesProps> = ({ count = 65, theme 
       </bufferGeometry>
       <pointsMaterial
         size={0.015}
-        color={particleColor}
+        color="#e0f2fe"
         transparent
         opacity={0.65}
         blending={THREE.AdditiveBlending}

@@ -145,19 +145,30 @@ export const DeskLamp: React.FC<DeskLampProps> = ({
               <meshStandardMaterial
                 color={isOn ? '#fef3c7' : '#334155'}
                 emissive={isOn ? '#fef3c7' : '#000000'}
-                emissiveIntensity={isOn ? 1.4 : 0}
+                emissiveIntensity={isOn ? 1.6 : 0}
                 flatShading
               />
             </mesh>
 
-            {/* Warm Task Light */}
+            {/* Warm Focused Task Light */}
             {isOn && (
-              <pointLight
-                position={[0, -0.02, 0]}
-                intensity={1.5}
-                distance={2.8}
-                color="#fde68a"
-              />
+              <>
+                <pointLight
+                  position={[0, -0.02, 0]}
+                  intensity={1.6}
+                  distance={3.0}
+                  color="#fde68a"
+                />
+                <spotLight
+                  position={[0, -0.02, 0]}
+                  target-position={[0, -1.0, 0]}
+                  intensity={2.2}
+                  angle={0.6}
+                  penumbra={0.5}
+                  distance={3.2}
+                  color="#fde68a"
+                />
+              </>
             )}
           </group>
         </group>

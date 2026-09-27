@@ -230,7 +230,7 @@ export const Workbench: React.FC<WorkbenchProps> = ({
         ))}
       </group>
 
-      {/* Overhead Luminaire Fixture */}
+      {/* Overhead Luminaire Fixture Frame */}
       <group position={[0, tableH + shelfH + 0.32, -tableD / 2 + 0.3]}>
         <mesh position={[-tableW / 2 + 0.2, -0.15, -0.15]} castShadow>
           <boxGeometry args={[0.025, 0.3, 0.025]} />
@@ -246,7 +246,7 @@ export const Workbench: React.FC<WorkbenchProps> = ({
         </mesh>
         <mesh position={[0, -0.016, 0]}>
           <boxGeometry args={[tableW - 0.64, 0.004, 0.08]} />
-          <meshStandardMaterial color="#fef3c7" emissive="#fef3c7" emissiveIntensity={0.8} />
+          <meshStandardMaterial color="#334155" roughness={0.8} flatShading />
         </mesh>
       </group>
 

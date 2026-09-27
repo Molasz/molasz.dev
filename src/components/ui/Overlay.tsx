@@ -12,22 +12,26 @@ import {
   VolumeX,
   BookOpen,
   Keyboard,
-  Sun,
-  Moon,
-  Lightbulb,
   Sparkles,
+  Home,
+  Hammer,
+  Trees,
+  Bed,
+  MapPin,
 } from 'lucide-react'
-import type { ViewPreset, LightingTheme } from '../../types/lab'
+import type { ViewPreset, HomeViewPreset, AppScene } from '../../types/lab'
 import { LabNotebookModal } from './LabNotebookModal'
 import { ShortcutsModal } from './ShortcutsModal'
 import { QuickControlCenter } from './QuickControlCenter'
 import { soundFx } from '../../utils/sound'
 
 interface OverlayProps {
+  currentScene: AppScene
+  onSelectScene: (scene: AppScene) => void
   currentView: ViewPreset
   onSelectView: (view: ViewPreset) => void
-  lightingTheme: LightingTheme
-  onChangeTheme: (theme: LightingTheme) => void
+  homeView: HomeViewPreset
+  onSelectHomeView: (view: HomeViewPreset) => void
   lampOn: boolean
   onToggleLamp: () => void
   soundEnabled: boolean
@@ -48,10 +52,12 @@ interface OverlayProps {
 }
 
 export const Overlay: React.FC<OverlayProps> = ({
+  currentScene,
+  onSelectScene,
   currentView,
   onSelectView,
-  lightingTheme,
-  onChangeTheme,
+  homeView,
+  onSelectHomeView,
   lampOn,
   onToggleLamp,
   soundEnabled,
@@ -73,7 +79,7 @@ export const Overlay: React.FC<OverlayProps> = ({
   const [isShortcutsOpen, setIsShortcutsOpen] = useState(false)
   const [isQuickControlsOpen, setIsQuickControlsOpen] = useState(false)
 
-  const navButtons: { id: ViewPreset; label: string; shortLabel: string; hotkey: string; icon: React.ReactNode }[] = [
+  const tallerNavButtons: { id: ViewPreset; label: string; shortLabel: string; hotkey: string; icon: React.ReactNode }[] = [
     { id: 'overview', label: 'Taula completa', shortLabel: 'Taula', hotkey: '1', icon: <LayoutGrid className="w-3.5 h-3.5" /> },
     { id: 'laptop', label: 'Portàtil IDE', shortLabel: 'Portàtil', hotkey: '2', icon: <Terminal className="w-3.5 h-3.5" /> },
     { id: 'instruments', label: 'Oscil·loscopi & Font', shortLabel: 'Instruments', hotkey: '3', icon: <Activity className="w-3.5 h-3.5" /> },
@@ -81,6 +87,14 @@ export const Overlay: React.FC<OverlayProps> = ({
     { id: 'soldering', label: 'Soldador', shortLabel: 'Soldador', hotkey: '5', icon: <Flame className="w-3.5 h-3.5" /> },
     { id: 'pegboard', label: 'Panell d’eines', shortLabel: 'Eines', hotkey: '6', icon: <Wrench className="w-3.5 h-3.5" /> },
     { id: 'topdown', label: 'Vista zenital', shortLabel: 'Zenital', hotkey: '7', icon: <Compass className="w-3.5 h-3.5" /> },
+  ]
+
+  const homeNavButtons: { id: HomeViewPreset; label: string; shortLabel: string; hotkey: string; icon: React.ReactNode }[] = [
+    { id: 'general', label: 'Vista general', shortLabel: 'General', hotkey: '1', icon: <Compass className="w-3.5 h-3.5" /> },
+    { id: 'taller_ext', label: 'Taller', shortLabel: 'Taller', hotkey: '2', icon: <Hammer className="w-3.5 h-3.5" /> },
+    { id: 'figuera', label: 'La Figuera', shortLabel: 'Figuera', hotkey: '3', icon: <Trees className="w-3.5 h-3.5" /> },
+    { id: 'habitacio_ext', label: 'Habitació', shortLabel: 'Habitació', hotkey: '4', icon: <Bed className="w-3.5 h-3.5" /> },
+    { id: 'jardi', label: 'Pati & Pou', shortLabel: 'Pati', hotkey: '5', icon: <MapPin className="w-3.5 h-3.5" /> },
   ]
 
   const scopeModes = ['48 MHz', 'SOLAR', 'HARM', 'BEACON']
@@ -92,26 +106,23 @@ export const Overlay: React.FC<OverlayProps> = ({
     onSelectView(view)
   }
 
-  const nextTheme: Record<LightingTheme, LightingTheme> = {
-    cyber: 'warm',
-    warm: 'clean',
-    clean: 'matrix',
-    matrix: 'cyber',
+  const handleSelectHomeView = (view: HomeViewPreset) => {
+    soundFx.cameraSwoosh(soundEnabled)
+    onSelectHomeView(view)
   }
 
-  const themeIcons: Record<LightingTheme, React.ReactNode> = {
-    cyber: <Moon className="w-3.5 h-3.5 text-cyan-400" />,
-    warm: <Sun className="w-3.5 h-3.5 text-amber-400" />,
-    clean: <Lightbulb className="w-3.5 h-3.5 text-sky-400" />,
-    matrix: <Sparkles className="w-3.5 h-3.5 text-emerald-400" />,
+  const handleSelectScene = (scene: AppScene) => {
+    soundFx.cameraSwoosh(soundEnabled)
+    onSelectScene(scene)
   }
 
   return (
     <div className="pointer-events-none absolute inset-0 z-30 flex flex-col justify-between p-3 sm:p-5 select-none overflow-hidden">
       {/* 1. TOP HEADER BAR */}
       <header className="flex flex-wrap items-center justify-between gap-3 w-full">
-        {/* Brand Badge & Project Notebook Button */}
+        {/* Left Area: Brand Badge + Scene Switcher (Home / Taller) + Utilities */}
         <div className="flex items-center gap-2 pointer-events-auto">
+          {/* Brand Badge */}
           <div
             onClick={onOpenNotebook}
             className="flex items-center gap-3 bg-slate-900/90 hover:bg-slate-800/90 backdrop-blur-md px-3.5 py-2 rounded-xl border border-slate-700/60 shadow-xl cursor-pointer transition-all group"
@@ -132,19 +143,33 @@ export const Overlay: React.FC<OverlayProps> = ({
             </div>
           </div>
 
-          {/* Quick Theme Cycle Button */}
-          <button
-            type="button"
-            onClick={() => {
-              onChangeTheme(nextTheme[lightingTheme])
-              soundFx.click(soundEnabled)
-            }}
-            className="p-2.5 bg-slate-900/90 hover:bg-slate-800 backdrop-blur-md rounded-xl border border-slate-700/60 text-slate-300 shadow-xl cursor-pointer transition-all"
-            title={`Atmosfera actual: ${lightingTheme}. Clic per canviar`}
-            aria-label="Canviar tema d'il·luminació"
-          >
-            {themeIcons[lightingTheme]}
-          </button>
+          {/* Scene Switcher: Home vs Taller */}
+          <div className="flex items-center gap-1 bg-slate-900/90 backdrop-blur-md p-1 rounded-xl border border-slate-700/60 shadow-xl text-xs font-mono">
+            <button
+              type="button"
+              onClick={() => handleSelectScene('home')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all cursor-pointer text-xs ${
+                currentScene === 'home'
+                  ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/50 font-medium shadow-sm'
+                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50 border border-transparent'
+              }`}
+            >
+              <Home className="w-3.5 h-3.5" />
+              <span>Home</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => handleSelectScene('taller')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all cursor-pointer text-xs ${
+                currentScene === 'taller'
+                  ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/50 font-medium shadow-sm'
+                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50 border border-transparent'
+              }`}
+            >
+              <Hammer className="w-3.5 h-3.5" />
+              <span>Taller</span>
+            </button>
+          </div>
 
           {/* Audio Sound FX Toggle */}
           <button
@@ -178,101 +203,144 @@ export const Overlay: React.FC<OverlayProps> = ({
         </div>
 
         {/* View Preset Switcher Menu */}
-        <nav className="pointer-events-auto flex items-center gap-1 bg-slate-900/90 backdrop-blur-md p-1.5 rounded-xl border border-slate-700/60 shadow-xl text-xs font-mono text-slate-300 max-w-full overflow-x-auto">
-          {navButtons.map((btn) => {
-            const isActive = currentView === btn.id
-            return (
-              <button
-                key={btn.id}
-                type="button"
-                onClick={() => handleSelectView(btn.id)}
-                className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg transition-all duration-200 cursor-pointer text-xs whitespace-nowrap ${
-                  isActive
-                    ? 'bg-slate-800 text-cyan-300 border border-cyan-500/50 shadow-md font-medium'
-                    : 'text-slate-400 hover:text-slate-100 hover:bg-slate-800/60 border border-transparent'
-                }`}
-                title={`Canviar a vista ${btn.label} (Tecla ${btn.hotkey})`}
-              >
-                {btn.icon}
-                <span className="hidden lg:inline">{btn.label}</span>
-                <span className="inline lg:hidden">{btn.shortLabel}</span>
-                <span className="hidden xl:inline text-[9px] text-slate-500 ml-0.5 px-1 py-0.2 rounded bg-slate-950/60">
-                  {btn.hotkey}
-                </span>
-              </button>
-            )
-          })}
+        <nav className="pointer-events-auto flex items-center gap-1 bg-slate-900/90 backdrop-blur-md p-1.5 rounded-xl border border-slate-700/60 shadow-xl text-xs font-mono text-slate-300 max-w-full overflow-x-auto animate-in fade-in duration-200">
+          {currentScene === 'taller'
+            ? tallerNavButtons.map((btn) => {
+                const isActive = currentView === btn.id
+                return (
+                  <button
+                    key={btn.id}
+                    type="button"
+                    onClick={() => handleSelectView(btn.id)}
+                    className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg transition-all duration-200 cursor-pointer text-xs whitespace-nowrap ${
+                      isActive
+                        ? 'bg-slate-800 text-cyan-300 border border-cyan-500/50 shadow-md font-medium'
+                        : 'text-slate-400 hover:text-slate-100 hover:bg-slate-800/60 border border-transparent'
+                    }`}
+                    title={`Canviar a vista ${btn.label} (Tecla ${btn.hotkey})`}
+                  >
+                    {btn.icon}
+                    <span className="hidden lg:inline">{btn.label}</span>
+                    <span className="inline lg:hidden">{btn.shortLabel}</span>
+                    <span className="hidden xl:inline text-[9px] text-slate-500 ml-0.5 px-1 py-0.2 rounded bg-slate-950/60">
+                      {btn.hotkey}
+                    </span>
+                  </button>
+                )
+              })
+            : homeNavButtons.map((btn) => {
+                const isActive = homeView === btn.id
+                return (
+                  <button
+                    key={btn.id}
+                    type="button"
+                    onClick={() => handleSelectHomeView(btn.id)}
+                    className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg transition-all duration-200 cursor-pointer text-xs whitespace-nowrap ${
+                      isActive
+                        ? 'bg-slate-800 text-cyan-300 border border-cyan-500/50 shadow-md font-medium'
+                        : 'text-slate-400 hover:text-slate-100 hover:bg-slate-800/60 border border-transparent'
+                    }`}
+                    title={`Canviar a vista ${btn.label} (Tecla ${btn.hotkey})`}
+                  >
+                    {btn.icon}
+                    <span className="hidden lg:inline">{btn.label}</span>
+                    <span className="inline lg:hidden">{btn.shortLabel}</span>
+                    <span className="hidden xl:inline text-[9px] text-slate-500 ml-0.5 px-1 py-0.2 rounded bg-slate-950/60">
+                      {btn.hotkey}
+                    </span>
+                  </button>
+                )
+              })}
         </nav>
       </header>
 
       {/* 2. BOTTOM CONTROL & TELEMETRY FOOTER */}
       <footer className="flex flex-wrap items-end justify-between gap-3 w-full">
-        {/* Left Telemetry Card */}
-        <div className="pointer-events-auto bg-slate-900/90 backdrop-blur-md px-4 py-3 rounded-2xl border border-slate-700/60 shadow-xl text-xs text-slate-300 max-w-md hidden sm:block">
-          <div className="flex items-center justify-between gap-2 mb-2 pb-1.5 border-b border-slate-800">
-            <div className="flex items-center gap-2 font-semibold text-slate-200 text-xs">
-              <RotateCcw className="w-3.5 h-3.5 text-cyan-400" />
-              Estat de la Instrumentació
+        {/* Left Telemetry Card (Taller Scene) */}
+        {currentScene === 'taller' ? (
+          <div className="pointer-events-auto bg-slate-900/90 backdrop-blur-md px-4 py-3 rounded-2xl border border-slate-700/60 shadow-xl text-xs text-slate-300 max-w-md hidden sm:block animate-in fade-in duration-200">
+            <div className="flex items-center justify-between gap-2 mb-2 pb-1.5 border-b border-slate-800">
+              <div className="flex items-center gap-2 font-semibold text-slate-200 text-xs">
+                <RotateCcw className="w-3.5 h-3.5 text-cyan-400" />
+                Estat de la Instrumentació
+              </div>
+              <button
+                type="button"
+                onClick={() => handleSelectView('overview')}
+                className="text-[10px] text-cyan-400 hover:text-cyan-300 underline cursor-pointer"
+              >
+                Reset Càmera (R)
+              </button>
             </div>
+
+            {/* Quick live gauges */}
+            <div className="grid grid-cols-4 gap-2 text-[10px] font-mono">
+              <div className="p-1.5 rounded bg-slate-950/50 border border-slate-800">
+                <span className="text-slate-500 block text-[9px]">OSCIL</span>
+                <span className="text-emerald-400 font-bold">{scopeModes[oscilloscopeMode % 4]}</span>
+              </div>
+              <div className="p-1.5 rounded bg-slate-950/50 border border-slate-800">
+                <span className="text-slate-500 block text-[9px]">FONT DC</span>
+                <span className="text-amber-400 font-bold">{powerPresets[powerPreset % 4]}</span>
+              </div>
+              <div className="p-1.5 rounded bg-slate-950/50 border border-slate-800">
+                <span className="text-slate-500 block text-[9px]">SOLDADOR</span>
+                <span className="text-orange-400 font-bold">{solderingTemps[solderingPreset % 4]}</span>
+              </div>
+              <div className="p-1.5 rounded bg-slate-950/50 border border-slate-800">
+                <span className="text-slate-500 block text-[9px]">LLUM</span>
+                <span className={lampOn ? 'text-amber-300 font-bold' : 'text-slate-500 font-bold'}>
+                  {lampOn ? 'ON' : 'OFF'}
+                </span>
+              </div>
+            </div>
+          </div>
+        ) : (
+          /* Left Hero Info Card (Home Scene) */
+          <div className="pointer-events-auto bg-slate-900/90 backdrop-blur-md px-5 py-4 rounded-2xl border border-slate-700/60 shadow-xl text-xs text-slate-300 max-w-sm animate-in fade-in duration-200">
+            <h2 className="text-sm font-semibold text-slate-100 mb-1 flex items-center gap-2">
+              <Sparkles className="w-4 h-4 text-cyan-400" />
+              La Parcel·la & Terreny
+            </h2>
+            <p className="text-slate-400 leading-relaxed text-[11px] mb-3">
+              Exterior segons el plànol <strong className="text-cyan-300">home.jpg</strong>: Taller, La Figuera, Habitació i pati central. Fes clic a l'edifici del Taller per entrar.
+            </p>
             <button
               type="button"
-              onClick={() => handleSelectView('overview')}
-              className="text-[10px] text-cyan-400 hover:text-cyan-300 underline cursor-pointer"
+              onClick={() => handleSelectScene('taller')}
+              className="px-3.5 py-1.5 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-slate-950 font-semibold font-mono text-xs cursor-pointer transition-colors"
             >
-              Reset Càmera (R)
+              Entrar al Taller →
             </button>
           </div>
+        )}
 
-          {/* Quick live gauges */}
-          <div className="grid grid-cols-4 gap-2 text-[10px] font-mono">
-            <div className="p-1.5 rounded bg-slate-950/50 border border-slate-800">
-              <span className="text-slate-500 block text-[9px]">OSCIL</span>
-              <span className="text-emerald-400 font-bold">{scopeModes[oscilloscopeMode % 4]}</span>
-            </div>
-            <div className="p-1.5 rounded bg-slate-950/50 border border-slate-800">
-              <span className="text-slate-500 block text-[9px]">FONT DC</span>
-              <span className="text-amber-400 font-bold">{powerPresets[powerPreset % 4]}</span>
-            </div>
-            <div className="p-1.5 rounded bg-slate-950/50 border border-slate-800">
-              <span className="text-slate-500 block text-[9px]">SOLDADOR</span>
-              <span className="text-orange-400 font-bold">{solderingTemps[solderingPreset % 4]}</span>
-            </div>
-            <div className="p-1.5 rounded bg-slate-950/50 border border-slate-800">
-              <span className="text-slate-500 block text-[9px]">LLUM</span>
-              <span className={lampOn ? 'text-amber-300 font-bold' : 'text-slate-500 font-bold'}>
-                {lampOn ? 'ON' : 'OFF'}
-              </span>
-            </div>
+        {/* Right Action Widgets & Quick Controls Drawer (Available in Taller) */}
+        {currentScene === 'taller' && (
+          <div className="flex items-center gap-2 ml-auto">
+            <QuickControlCenter
+              isOpen={isQuickControlsOpen}
+              onToggleOpen={() => {
+                setIsQuickControlsOpen((prev) => !prev)
+                soundFx.click(soundEnabled)
+              }}
+              lampOn={lampOn}
+              onToggleLamp={onToggleLamp}
+              soundEnabled={soundEnabled}
+              autoTour={autoTour}
+              onToggleAutoTour={onToggleAutoTour}
+              oscilloscopeMode={oscilloscopeMode}
+              onChangeOscilloscope={onChangeOscilloscope}
+              powerPreset={powerPreset}
+              onChangePowerPreset={onChangePowerPreset}
+              solderingPreset={solderingPreset}
+              onChangeSolderingPreset={onChangeSolderingPreset}
+              pcbActive={pcbActive}
+              onTogglePcb={onTogglePcb}
+              currentView={currentView}
+            />
           </div>
-        </div>
-
-        {/* Right Action Widgets & Quick Controls Drawer */}
-        <div className="flex items-center gap-2 ml-auto">
-          <QuickControlCenter
-            isOpen={isQuickControlsOpen}
-            onToggleOpen={() => {
-              setIsQuickControlsOpen((prev) => !prev)
-              soundFx.click(soundEnabled)
-            }}
-            lightingTheme={lightingTheme}
-            onChangeTheme={onChangeTheme}
-            lampOn={lampOn}
-            onToggleLamp={onToggleLamp}
-            soundEnabled={soundEnabled}
-            onToggleSound={onToggleSound}
-            autoTour={autoTour}
-            onToggleAutoTour={onToggleAutoTour}
-            oscilloscopeMode={oscilloscopeMode}
-            onChangeOscilloscope={onChangeOscilloscope}
-            powerPreset={powerPreset}
-            onChangePowerPreset={onChangePowerPreset}
-            solderingPreset={solderingPreset}
-            onChangeSolderingPreset={onChangeSolderingPreset}
-            pcbActive={pcbActive}
-            onTogglePcb={onTogglePcb}
-            currentView={currentView}
-          />
-        </div>
+        )}
       </footer>
 
       {/* 3. MODALS */}

@@ -4,27 +4,21 @@ import {
   Zap,
   Flame,
   Lightbulb,
-  Sun,
-  Moon,
   Play,
   Pause,
   Sliders,
-  Sparkles,
   ChevronDown,
   ChevronUp,
 } from 'lucide-react'
-import type { LightingTheme, ViewPreset } from '../../types/lab'
+import type { ViewPreset } from '../../types/lab'
 import { soundFx } from '../../utils/sound'
 
 interface QuickControlCenterProps {
   isOpen: boolean
   onToggleOpen: () => void
-  lightingTheme: LightingTheme
-  onChangeTheme: (theme: LightingTheme) => void
   lampOn: boolean
   onToggleLamp: () => void
   soundEnabled: boolean
-  onToggleSound: () => void
   autoTour: boolean
   onToggleAutoTour: () => void
   oscilloscopeMode: number
@@ -41,8 +35,6 @@ interface QuickControlCenterProps {
 export const QuickControlCenter: React.FC<QuickControlCenterProps> = ({
   isOpen,
   onToggleOpen,
-  lightingTheme,
-  onChangeTheme,
   lampOn,
   onToggleLamp,
   soundEnabled,
@@ -61,13 +53,6 @@ export const QuickControlCenter: React.FC<QuickControlCenterProps> = ({
   const powerPresets = ['3.3V (0.45A)', '5.0V (1.20A)', '12.0V (2.15A)', '24.0V (0.80A)']
   const solderingTemps = ['350 °C', '380 °C', '420 °C', 'STBY']
 
-  const themes: { id: LightingTheme; label: string; icon: React.ReactNode }[] = [
-    { id: 'cyber', label: 'Cyber Slate', icon: <Moon className="w-3 h-3 text-cyan-400" /> },
-    { id: 'warm', label: 'Caliu Foguera', icon: <Sun className="w-3 h-3 text-amber-400" /> },
-    { id: 'clean', label: 'Laboratori Clar', icon: <Lightbulb className="w-3 h-3 text-sky-400" /> },
-    { id: 'matrix', label: 'Matrix Terminal', icon: <Sparkles className="w-3 h-3 text-emerald-400" /> },
-  ]
-
   return (
     <div className="pointer-events-auto flex flex-col items-end">
       {/* Drawer Container */}
@@ -79,31 +64,6 @@ export const QuickControlCenter: React.FC<QuickControlCenterProps> = ({
               Panell de Control dels Instruments
             </span>
             <span className="text-[10px] text-slate-400">molasz.dev</span>
-          </div>
-
-          {/* Theme Selector */}
-          <div>
-            <label className="text-[11px] text-slate-400 mb-1.5 block">Atmosfera & Il·luminació</label>
-            <div className="grid grid-cols-2 gap-1.5">
-              {themes.map((t) => (
-                <button
-                  key={t.id}
-                  type="button"
-                  onClick={() => {
-                    onChangeTheme(t.id)
-                    soundFx.click(soundEnabled)
-                  }}
-                  className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-[11px] transition-all cursor-pointer ${
-                    lightingTheme === t.id
-                      ? 'bg-slate-800 text-slate-100 border-cyan-500/50 shadow-sm font-medium'
-                      : 'bg-slate-950/40 text-slate-400 border-slate-800 hover:text-slate-200 hover:bg-slate-800/50'
-                  }`}
-                >
-                  {t.icon}
-                  <span className="truncate">{t.label}</span>
-                </button>
-              ))}
-            </div>
           </div>
 
           {/* Oscilloscope Frequency Selector */}

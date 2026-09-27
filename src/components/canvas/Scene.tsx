@@ -6,14 +6,16 @@ import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib'
 import { Workbench } from './Workbench'
 import { Lighting } from './Lighting'
 import { Environment } from './Environment'
-import { DustParticles } from './DustParticles'
 import { CameraController } from './CameraController'
-import type { ViewPreset, LightingTheme } from '../../types/lab'
+import { WorkshopRoom } from './WorkshopRoom'
+import { WorkshopStool } from '../props/WorkshopStool'
+import { StorageRack } from '../props/StorageRack'
+import { TrashBin } from '../props/TrashBin'
+import type { ViewPreset } from '../../types/lab'
 
 interface SceneProps {
   view: ViewPreset
   onViewChange?: (view: ViewPreset) => void
-  lightingTheme: LightingTheme
   lampOn: boolean
   onToggleLamp: () => void
   soundEnabled: boolean
@@ -32,7 +34,6 @@ interface SceneProps {
 export const Scene: React.FC<SceneProps> = ({
   view,
   onViewChange,
-  lightingTheme,
   lampOn,
   onToggleLamp,
   soundEnabled,
@@ -49,13 +50,6 @@ export const Scene: React.FC<SceneProps> = ({
 }) => {
   const controlsRef = useRef<OrbitControlsImpl | null>(null)
 
-  const bgColor = {
-    cyber: '#0a0e17',
-    warm: '#0f0c0a',
-    clean: '#0f172a',
-    matrix: '#030a06',
-  }[lightingTheme]
-
   return (
     <div className="absolute inset-0 w-full h-full">
       <Canvas
@@ -63,7 +57,7 @@ export const Scene: React.FC<SceneProps> = ({
         dpr={[1, 2]}
         performance={{ min: 0.5 }}
         camera={{
-          position: [0, 1.85, 3.10],
+          position: [-1.45, 1.85, 2.40],
           fov: 45,
           near: 0.1,
           far: 35,
@@ -72,30 +66,56 @@ export const Scene: React.FC<SceneProps> = ({
           antialias: true,
           powerPreference: 'high-performance',
           toneMapping: THREE.ACESFilmicToneMapping,
-          toneMappingExposure: 1.15,
+          toneMappingExposure: 1.35,
         }}
       >
-        <color attach="background" args={[bgColor]} />
-        <fog attach="fog" args={[bgColor, 8, 24]} />
+        <color attach="background" args={['#1e293b']} />
+        <fog attach="fog" args={['#1e293b', 16, 40]} />
 
         <Suspense fallback={null}>
-          <Lighting theme={lightingTheme} lampOn={lampOn} />
-          <Workbench
-            soundEnabled={soundEnabled}
-            lampOn={lampOn}
-            onToggleLamp={onToggleLamp}
-            onOpenProjects={onOpenProjects}
-            oscilloscopeMode={oscilloscopeMode}
-            onOscilloscopeChange={onOscilloscopeChange}
-            powerPreset={powerPreset}
-            onPowerPresetChange={onPowerPresetChange}
-            solderingPreset={solderingPreset}
-            onSolderingPresetChange={onSolderingPresetChange}
-            pcbActive={pcbActive}
-            onPcbToggle={onPcbToggle}
+          <Lighting lampOn={lampOn} />
+
+          {/* Architectural Workshop Room */}
+          <WorkshopRoom />
+
+          {/* Table Station Group (Positioned at left side near the door: [-1.45, 0, -0.7]) */}
+          <group position={[-1.45, 0, -0.7]}>
+            {/* Workbench with instruments and tools */}
+            <Workbench
+              soundEnabled={soundEnabled}
+              lampOn={lampOn}
+              onToggleLamp={onToggleLamp}
+              onOpenProjects={onOpenProjects}
+              oscilloscopeMode={oscilloscopeMode}
+              onOscilloscopeChange={onOscilloscopeChange}
+              powerPreset={powerPreset}
+              onPowerPresetChange={onPowerPresetChange}
+              solderingPreset={solderingPreset}
+              onSolderingPresetChange={onSolderingPresetChange}
+              pcbActive={pcbActive}
+              onPcbToggle={onPcbToggle}
+            />
+
+            {/* Workshop Swivel Stool in front of table */}
+            <WorkshopStool
+              position={[-0.15, 0, 0.68]}
+              rotation={[0, -0.2, 0]}
+              soundEnabled={soundEnabled}
+            />
+
+            {/* Metal Waste Bin beside table */}
+            <TrashBin
+              position={[1.25, 0, 0.35]}
+            />
+          </group>
+
+          {/* Industrial Storage Rack along Right Wall */}
+          <StorageRack
+            position={[2.5, 0, -0.6]}
+            rotation={[0, -Math.PI / 2, 0]}
           />
-          <Environment theme={lightingTheme} />
-          <DustParticles count={70} theme={lightingTheme} />
+
+          <Environment />
         </Suspense>
 
         <CameraController
@@ -108,7 +128,7 @@ export const Scene: React.FC<SceneProps> = ({
         <OrbitControls
           ref={controlsRef}
           makeDefault
-          target={[0, 0.98, -0.05]}
+          target={[-1.45, 0.98, -0.75]}
           minDistance={0.7}
           maxDistance={7.5}
           maxPolarAngle={Math.PI / 2 - 0.05}

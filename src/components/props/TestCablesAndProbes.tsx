@@ -10,10 +10,8 @@ export const TestCablesAndProbes: React.FC<TestCablesAndProbesProps> = ({
   position = [0, 0, 0],
   rotation = [0, 0, 0],
 }) => {
-  // 1. Oscilloscope Probe Cable (Curves from upper shelf CH1 down to PCB test pin)
+  // 1. Oscilloscope Probe Cable
   const probeCurve = useMemo(() => {
-    // Oscilloscope CH1 position in world coordinates relative to Workbench
-    // Starts at upper shelf ~ [-0.37, 1.40, -0.28], drops smoothly and ends at PCB ~ [-0.03, 0.86, -0.06]
     return new THREE.CatmullRomCurve3([
       new THREE.Vector3(-0.37, 1.39, -0.26),
       new THREE.Vector3(-0.35, 1.15, -0.15),
@@ -81,10 +79,10 @@ export const TestCablesAndProbes: React.FC<TestCablesAndProbesProps> = ({
         <meshStandardMaterial color="#0f172a" roughness={0.6} flatShading />
       </mesh>
 
-      {/* 4. Coiled ESD Wrist Strap on Mat (Yellow/Black Antistatic Band) */}
+      {/* 4. Coiled ESD Wrist Strap on Mat */}
       <group position={[-0.60, 0.85, 0.22]} rotation={[0, 0.3, 0]}>
-        {/* Elastic Fabric Band */}
-        <mesh castShadow>
+        {/* Elastic Fabric Band (Horizontal on mat) */}
+        <mesh rotation={[Math.PI / 2, 0, 0]} castShadow>
           <torusGeometry args={[0.032, 0.008, 6, 12]} />
           <meshStandardMaterial color="#0284c7" roughness={0.75} flatShading />
         </mesh>
