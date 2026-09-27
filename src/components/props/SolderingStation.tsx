@@ -1,11 +1,15 @@
-import React, { useState, useRef, useEffect } from 'react'
+import React, { useState, useRef, useEffect, useMemo } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
+import { soundFx } from '../../utils/sound'
 
 interface SolderingStationProps {
   position?: [number, number, number]
   rotation?: [number, number, number]
   scale?: number
+  soundEnabled?: boolean
+  tempIndex?: number
+  onTempChange?: (idx: number) => void
 }
 
 const TEMPS = ['350 °C', '380 °C', '420 °C', 'STBY']
@@ -14,10 +18,25 @@ export const SolderingStation: React.FC<SolderingStationProps> = ({
   position = [0, 0, 0],
   rotation = [0, 0, 0],
   scale = 1,
+  soundEnabled = true,
+  tempIndex: externalTemp,
+  onTempChange,
 }) => {
-  const [tempIndex, setTempIndex] = useState(0)
+  const [internalTemp, setInternalTemp] = useState(0)
+  const currentTemp = externalTemp !== undefined ? externalTemp : internalTemp
   const [isLifted, setIsLifted] = useState(false)
   const [hovered, setHovered] = useState(false)
+
+  const ironGroupRef = useRef<THREE.Group>(null)
+  const textureRef = useRef<THREE.CanvasTexture>(null)
+  const ironLift = useRef(0)
+
+  const canvas = useMemo(() => {
+    const c = document.createElement('canvas')
+    c.width = 128
+    c.height = 36
+    return c
+  }, [])
 
   useEffect(() => {
     document.body.style.cursor = hovered ? 'pointer' : 'auto'
@@ -25,9 +44,6 @@ export const SolderingStation: React.FC<SolderingStationProps> = ({
       document.body.style.cursor = 'auto'
     }
   }, [hovered])
-
-  const ironGroupRef = useRef<THREE.Group>(null)
-  const ironLift = useRef(0)
 
   useFrame(() => {
     const targetLift = isLifted ? 0.04 : 0
@@ -38,26 +54,30 @@ export const SolderingStation: React.FC<SolderingStationProps> = ({
     }
   })
 
-  const tempTexture = React.useMemo(() => {
-    const c = document.createElement('canvas')
-    c.width = 128
-    c.height = 36
-    const ctx = c.getContext('2d')
+  useEffect(() => {
+    const ctx = canvas.getContext('2d')
     if (ctx) {
       ctx.fillStyle = '#0c1017'
       ctx.fillRect(0, 0, 128, 36)
       ctx.fillStyle = '#38bdf8'
       ctx.font = 'bold 20px monospace'
-      ctx.fillText(TEMPS[tempIndex], 16, 26)
+      ctx.fillText(TEMPS[currentTemp % TEMPS.length], 16, 26)
+      if (textureRef.current) {
+        textureRef.current.needsUpdate = true
+      }
     }
-    const tex = new THREE.CanvasTexture(c)
-    return tex
-  }, [tempIndex])
+  }, [currentTemp, canvas])
 
   const handleClick = (e: { stopPropagation: () => void }) => {
     e.stopPropagation()
-    setTempIndex((prev) => (prev + 1) % TEMPS.length)
+    const next = (currentTemp + 1) % TEMPS.length
+    if (onTempChange) {
+      onTempChange(next)
+    } else {
+      setInternalTemp(next)
+    }
     setIsLifted((prev) => !prev)
+    soundFx.solderSizzle(soundEnabled)
   }
 
   return (
@@ -84,7 +104,7 @@ export const SolderingStation: React.FC<SolderingStationProps> = ({
           />
         </mesh>
 
-        {/* Heat dissipation vents on sides */}
+        {/* Heat dissipation vents */}
         {[-0.02, 0, 0.02].map((sy, sIdx) => (
           <mesh key={`sol-vent-${sIdx}`} position={[-0.0805, 0.05 + sy, 0]}>
             <boxGeometry args={[0.001, 0.006, 0.08]} />
@@ -101,7 +121,9 @@ export const SolderingStation: React.FC<SolderingStationProps> = ({
         {/* Digital Temp Display */}
         <mesh position={[0, 0.065, 0.094]}>
           <planeGeometry args={[0.085, 0.026]} />
-          <meshBasicMaterial map={tempTexture} />
+          <meshBasicMaterial toneMapped={false}>
+            <canvasTexture ref={textureRef} attach="map" image={canvas} />
+          </meshBasicMaterial>
         </mesh>
 
         {/* Brass Temp Buttons */}
@@ -115,7 +137,7 @@ export const SolderingStation: React.FC<SolderingStationProps> = ({
         </mesh>
       </group>
 
-      {/* Soldering Iron Stand with Heat Shield */}
+      {/* Soldering Iron Stand */}
       <group position={[0.16, 0, 0.02]}>
         <mesh position={[0, 0.02, 0]} castShadow receiveShadow>
           <boxGeometry args={[0.12, 0.04, 0.16]} />
@@ -135,24 +157,20 @@ export const SolderingStation: React.FC<SolderingStationProps> = ({
             />
           </mesh>
 
-          {/* Soldering Iron with Ergonomic Grip */}
+          {/* Soldering Iron */}
           <group ref={ironGroupRef} position={[0, 0.03, 0]}>
-            {/* Ribbed Grip Handle */}
             <mesh position={[0, 0.08, 0]} castShadow>
               <cylinderGeometry args={[0.012, 0.015, 0.14, 8]} />
               <meshStandardMaterial color="#2d4458" roughness={0.6} flatShading />
             </mesh>
-            {/* Silicone Heat Collar */}
             <mesh position={[0, 0.02, 0]} castShadow>
               <cylinderGeometry args={[0.013, 0.013, 0.012, 8]} />
               <meshStandardMaterial color="#9a3412" roughness={0.7} flatShading />
             </mesh>
-            {/* Chrome Barrel */}
             <mesh position={[0, -0.01, 0]} castShadow>
               <cylinderGeometry args={[0.008, 0.008, 0.04, 8]} />
               <meshStandardMaterial color="#cbd5e1" metalness={0.9} roughness={0.2} flatShading />
             </mesh>
-            {/* Hot Tip Ember */}
             <mesh position={[0, -0.04, 0]} rotation={[Math.PI, 0, 0]}>
               <coneGeometry args={[0.004, 0.025, 8]} />
               <meshStandardMaterial
@@ -167,7 +185,7 @@ export const SolderingStation: React.FC<SolderingStationProps> = ({
           </group>
         </group>
 
-        {/* Brass Cleaner Pot with Golden Wire Curls */}
+        {/* Brass Cleaner Pot */}
         <group position={[0, 0.04, 0.04]}>
           <mesh castShadow>
             <cylinderGeometry args={[0.025, 0.022, 0.02, 8]} />
@@ -180,7 +198,7 @@ export const SolderingStation: React.FC<SolderingStationProps> = ({
         </group>
       </group>
 
-      {/* Solder Spool with Brass Weighted Stand */}
+      {/* Solder Spool */}
       <group position={[-0.14, 0, 0.02]}>
         <mesh position={[0, 0.035, 0]} rotation={[0, 0, Math.PI / 2]} castShadow>
           <cylinderGeometry args={[0.035, 0.035, 0.05, 8]} />

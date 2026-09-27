@@ -1,11 +1,13 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
+import { soundFx } from '../../utils/sound'
 
 interface MultimeterProps {
   position?: [number, number, number]
   rotation?: [number, number, number]
   scale?: number
+  soundEnabled?: boolean
 }
 
 const MODES = [
@@ -20,11 +22,20 @@ export const Multimeter: React.FC<MultimeterProps> = ({
   position = [0, 0, 0],
   rotation = [0, 0, 0],
   scale = 1,
+  soundEnabled = true,
 }) => {
   const [modeIdx, setModeIdx] = useState(0)
   const [hovered, setHovered] = useState(false)
   const dialRef = useRef<THREE.Mesh>(null)
+  const textureRef = useRef<THREE.CanvasTexture>(null)
   const dialAngle = useRef(0)
+
+  const canvas = useMemo(() => {
+    const c = document.createElement('canvas')
+    c.width = 128
+    c.height = 64
+    return c
+  }, [])
 
   useEffect(() => {
     document.body.style.cursor = hovered ? 'pointer' : 'auto'
@@ -39,11 +50,8 @@ export const Multimeter: React.FC<MultimeterProps> = ({
     if (dialRef.current) dialRef.current.rotation.y = dialAngle.current
   })
 
-  const lcdTexture = useMemo(() => {
-    const c = document.createElement('canvas')
-    c.width = 128
-    c.height = 64
-    const ctx = c.getContext('2d')
+  useEffect(() => {
+    const ctx = canvas.getContext('2d')
     if (ctx) {
       ctx.fillStyle = '#17222e'
       ctx.fillRect(0, 0, 128, 64)
@@ -52,14 +60,16 @@ export const Multimeter: React.FC<MultimeterProps> = ({
       ctx.fillText(MODES[modeIdx].val, 10, 36)
       ctx.font = 'bold 12px monospace'
       ctx.fillText(MODES[modeIdx].unit, 70, 54)
+      if (textureRef.current) {
+        textureRef.current.needsUpdate = true
+      }
     }
-    const tex = new THREE.CanvasTexture(c)
-    return tex
-  }, [modeIdx])
+  }, [modeIdx, canvas])
 
   const handleClick = (e: { stopPropagation: () => void }) => {
     e.stopPropagation()
     setModeIdx((prev) => (prev + 1) % MODES.length)
+    soundFx.click(soundEnabled)
   }
 
   return (
@@ -74,7 +84,7 @@ export const Multimeter: React.FC<MultimeterProps> = ({
       }}
       onPointerOut={() => setHovered(false)}
     >
-      {/* Vintage Ochre Rubber Protective Holster with Corner Bumpers */}
+      {/* Rubber Protective Holster */}
       <mesh position={[0, 0.018, 0]} castShadow receiveShadow>
         <boxGeometry args={[0.092, 0.034, 0.172]} />
         <meshStandardMaterial
@@ -84,31 +94,32 @@ export const Multimeter: React.FC<MultimeterProps> = ({
         />
       </mesh>
 
-      {/* Dark Inner Face (Top surface at y = 0.033) */}
+      {/* Dark Inner Face */}
       <mesh position={[0, 0.031, 0]}>
         <boxGeometry args={[0.078, 0.004, 0.155]} />
         <meshStandardMaterial color="#1a202c" roughness={0.8} flatShading />
       </mesh>
 
-      {/* LCD Bezel Frame (Top surface at y = 0.035) */}
+      {/* LCD Bezel Frame */}
       <mesh position={[0, 0.034, -0.045]}>
         <boxGeometry args={[0.068, 0.002, 0.038]} />
         <meshStandardMaterial color="#0c1015" roughness={0.9} flatShading />
       </mesh>
 
-      {/* LCD Screen Display (Elevated to y = 0.0355, 100% zero z-fighting) */}
+      {/* LCD Screen Display */}
       <mesh position={[0, 0.0355, -0.045]} rotation={[-Math.PI / 2, 0, 0]}>
         <planeGeometry args={[0.064, 0.034]} />
-        <meshBasicMaterial map={lcdTexture} toneMapped={false} />
+        <meshBasicMaterial toneMapped={false}>
+          <canvasTexture ref={textureRef} attach="map" image={canvas} />
+        </meshBasicMaterial>
       </mesh>
 
-      {/* Rotary Selector Dial with Pointer Notch */}
+      {/* Rotary Selector Dial */}
       <group position={[0, 0.036, 0.015]}>
         <mesh ref={dialRef} castShadow>
           <cylinderGeometry args={[0.02, 0.02, 0.01, 8]} />
           <meshStandardMaterial color="#2d3748" roughness={0.5} flatShading />
         </mesh>
-        {/* Dial Center Brass Dot */}
         <mesh position={[0, 0.006, 0]} castShadow>
           <cylinderGeometry args={[0.005, 0.005, 0.002, 6]} />
           <meshStandardMaterial color="#b5935b" metalness={0.8} roughness={0.3} flatShading />

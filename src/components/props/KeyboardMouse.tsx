@@ -1,17 +1,24 @@
 import React, { useState, useRef, useEffect } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
+import { soundFx } from '../../utils/sound'
 
 interface KeyboardMouseProps {
   position?: [number, number, number]
   rotation?: [number, number, number]
   scale?: number
+  soundEnabled?: boolean
 }
+
+const KB_H = 0.018
+const KB_W = 0.32
+const KB_D = 0.13
 
 export const KeyboardMouse: React.FC<KeyboardMouseProps> = ({
   position = [0, 0, 0],
   rotation = [0, 0, 0],
   scale = 1,
+  soundEnabled = true,
 }) => {
   const [clickCount, setClickCount] = useState(0)
   const [mouseClicked, setMouseClicked] = useState(false)
@@ -47,12 +54,10 @@ export const KeyboardMouse: React.FC<KeyboardMouseProps> = ({
     // 1. Mouse motion animation (Glide on click and return)
     if (mouseMoveTimer.current > 0) {
       mouseMoveTimer.current -= delta
-      // Gliding movement while clicking
       mouseTargetX.current = 0.22 + Math.sin(timeRef.current * 8) * 0.015
       mouseTargetZ.current = -0.01 + Math.cos(timeRef.current * 8) * 0.01
       mouseTargetRot.current = -0.08
     } else {
-      // Rest position
       mouseTargetX.current = 0.20
       mouseTargetZ.current = 0.01
       mouseTargetRot.current = 0
@@ -80,40 +85,38 @@ export const KeyboardMouse: React.FC<KeyboardMouseProps> = ({
     if (typingTimer.current > 0) {
       typingTimer.current -= delta
       if (kbChassisRef.current) {
-        kbChassisRef.current.position.y = (kbH / 2) + Math.sin(timeRef.current * 45) * 0.0008
+        kbChassisRef.current.position.y = (KB_H / 2) + Math.sin(timeRef.current * 45) * 0.0008
       }
     } else if (kbChassisRef.current) {
-      kbChassisRef.current.position.y = kbH / 2
+      kbChassisRef.current.position.y = KB_H / 2
     }
   })
 
-  const kbW = 0.32
-  const kbD = 0.13
-  const kbH = 0.018
-
   const rows = [
-    { count: 14, z: -0.045, height: 0.007, y: kbH },
-    { count: 14, z: -0.026, height: 0.006, y: kbH - 0.001 },
-    { count: 13, z: -0.007, height: 0.0055, y: kbH - 0.002 },
-    { count: 12, z: 0.012, height: 0.005, y: kbH - 0.003 },
+    { count: 14, z: -0.045, height: 0.007, y: KB_H },
+    { count: 14, z: -0.026, height: 0.006, y: KB_H - 0.001 },
+    { count: 13, z: -0.007, height: 0.0055, y: KB_H - 0.002 },
+    { count: 12, z: 0.012, height: 0.005, y: KB_H - 0.003 },
   ]
 
   const handleKeyboardClick = (e: { stopPropagation: () => void }) => {
     e.stopPropagation()
     setClickCount((prev) => prev + 1)
-    typingTimer.current = 0.8 // 0.8s active typing wave
+    typingTimer.current = 0.8
+    soundFx.keyboardKey(soundEnabled)
   }
 
   const handleMouseClick = (e: { stopPropagation: () => void }) => {
     e.stopPropagation()
     setMouseClicked(true)
     setClickCount((prev) => prev + 1)
-    mouseMoveTimer.current = 0.6 // 0.6s mouse glide swipe
+    mouseMoveTimer.current = 0.6
+    soundFx.click(soundEnabled)
   }
 
   return (
     <group position={position} rotation={rotation} scale={scale}>
-      {/* 1. CUSTOM MECHANICAL KEYBOARD (Rests directly on ESD work surface) */}
+      {/* 1. CUSTOM MECHANICAL KEYBOARD */}
       <group
         position={[-0.10, 0, 0]}
         onClick={handleKeyboardClick}
@@ -123,10 +126,10 @@ export const KeyboardMouse: React.FC<KeyboardMouseProps> = ({
         }}
         onPointerOut={() => setHovered(false)}
       >
-        <group ref={kbChassisRef} position={[0, kbH / 2, 0]} rotation={[0.08, 0, 0]}>
+        <group ref={kbChassisRef} position={[0, KB_H / 2, 0]} rotation={[0.08, 0, 0]}>
           {/* Forged Slate Aluminum Case */}
           <mesh castShadow receiveShadow>
-            <boxGeometry args={[kbW, kbH, kbD]} />
+            <boxGeometry args={[KB_W, KB_H, KB_D]} />
             <meshStandardMaterial
               color={hovered ? '#26303c' : '#1d2530'}
               metalness={0.65}
@@ -136,13 +139,13 @@ export const KeyboardMouse: React.FC<KeyboardMouseProps> = ({
           </mesh>
 
           {/* Brass Switch Plate */}
-          <mesh position={[0, kbH / 2 + 0.0006, 0]}>
-            <boxGeometry args={[kbW * 0.94, 0.001, kbD * 0.88]} />
+          <mesh position={[0, KB_H / 2 + 0.0006, 0]}>
+            <boxGeometry args={[KB_W * 0.94, 0.001, KB_D * 0.88]} />
             <meshStandardMaterial color="#b5935b" metalness={0.75} roughness={0.3} flatShading />
           </mesh>
 
           {/* Mini OLED Screen */}
-          <group position={[kbW / 2 - 0.042, kbH / 2 + 0.004, -kbD / 2 + 0.018]}>
+          <group position={[KB_W / 2 - 0.042, KB_H / 2 + 0.004, -KB_D / 2 + 0.018]}>
             <mesh castShadow>
               <boxGeometry args={[0.038, 0.004, 0.014]} />
               <meshStandardMaterial color="#0c1015" roughness={0.8} flatShading />
@@ -155,7 +158,7 @@ export const KeyboardMouse: React.FC<KeyboardMouseProps> = ({
 
           {/* Rotary Volume Encoder Knob */}
           <mesh
-            position={[kbW / 2 - 0.016, kbH / 2 + 0.008, -kbD / 2 + 0.018]}
+            position={[KB_W / 2 - 0.016, KB_H / 2 + 0.008, -KB_D / 2 + 0.018]}
             rotation={[0, clickCount * 0.25, 0]}
             castShadow
           >
@@ -163,10 +166,10 @@ export const KeyboardMouse: React.FC<KeyboardMouseProps> = ({
             <meshStandardMaterial color="#9a3412" metalness={0.7} roughness={0.3} flatShading />
           </mesh>
 
-          {/* Stepped Keycaps Array with Live Wave Ripple */}
+          {/* Stepped Keycaps Array */}
           <group>
             {rows.map((row, rIdx) => {
-              const rowWidth = kbW * 0.88
+              const rowWidth = KB_W * 0.88
               const step = rowWidth / row.count
               return (
                 <group key={rIdx} position={[0, row.y, row.z]}>
@@ -180,14 +183,8 @@ export const KeyboardMouse: React.FC<KeyboardMouseProps> = ({
                     if (rIdx === 2 && (kIdx === 1 || kIdx === 2 || kIdx === 3)) keyColor = '#2d5a3f'
                     if (rIdx === 2 && kIdx === row.count - 1) keyColor = '#b45309'
 
-                    // Ripple dip on typing
-                    const isTypingActive = typingTimer.current > 0
-                    const keyDip = isTypingActive
-                      ? Math.max(0, Math.sin(timeRef.current * 25 + kIdx * 0.8 + rIdx * 1.2)) * 0.0018
-                      : 0
-
                     return (
-                      <mesh key={kIdx} position={[kx, -keyDip, 0]} castShadow>
+                      <mesh key={kIdx} position={[kx, 0, 0]} castShadow>
                         <boxGeometry args={[step * 0.88, row.height, 0.016]} />
                         <meshStandardMaterial
                           color={keyColor}
@@ -204,7 +201,7 @@ export const KeyboardMouse: React.FC<KeyboardMouseProps> = ({
           </group>
 
           {/* Row 5: Spacebar & Modifiers */}
-          <group position={[0, kbH - 0.004, 0.032]}>
+          <group position={[0, KB_H - 0.004, 0.032]}>
             {[-0.125, -0.1, -0.075].map((mx, idx) => (
               <mesh key={`bmod-l-${idx}`} position={[mx, 0, 0]} castShadow>
                 <boxGeometry args={[0.02, 0.005, 0.017]} />
@@ -240,7 +237,7 @@ export const KeyboardMouse: React.FC<KeyboardMouseProps> = ({
         </group>
       </group>
 
-      {/* 2. SCULPTED ERGONOMIC MOUSE (With Live Glide & Click Animation) */}
+      {/* 2. SCULPTED ERGONOMIC MOUSE */}
       <group
         ref={mouseGroupRef}
         position={[0.20, 0.001, 0.01]}

@@ -1,9 +1,37 @@
 import React, { useMemo } from 'react'
 import { Grid, ContactShadows } from '@react-three/drei'
 import { getFloorTexture } from '../../utils/textures'
+import type { LightingTheme } from '../../types/lab'
 
-export const Environment: React.FC = () => {
+interface EnvironmentProps {
+  theme?: LightingTheme
+}
+
+export const Environment: React.FC<EnvironmentProps> = ({ theme = 'cyber' }) => {
   const floorTexture = useMemo(() => getFloorTexture(), [])
+
+  const gridConfig = {
+    cyber: {
+      floorColor: '#161d28',
+      cellColor: '#1c2533',
+      sectionColor: '#253244',
+    },
+    warm: {
+      floorColor: '#201815',
+      cellColor: '#2d1f1a',
+      sectionColor: '#3d2b22',
+    },
+    clean: {
+      floorColor: '#1e293b',
+      cellColor: '#334155',
+      sectionColor: '#475569',
+    },
+    matrix: {
+      floorColor: '#0a1410',
+      cellColor: '#0f291e',
+      sectionColor: '#134e34',
+    },
+  }[theme]
 
   return (
     <>
@@ -12,23 +40,23 @@ export const Environment: React.FC = () => {
         <planeGeometry args={[30, 30]} />
         <meshStandardMaterial
           map={floorTexture}
-          color="#161d28"
+          color={gridConfig.floorColor}
           roughness={0.9}
           metalness={0.1}
           flatShading
         />
       </mesh>
 
-      {/* Soft Ambient Technical Floor Grid (Wide spacing, no shimmering) */}
+      {/* Ambient Technical Floor Grid */}
       <Grid
         position={[0, 0, 0]}
         args={[30, 30]}
         cellSize={1.0}
         cellThickness={0.4}
-        cellColor="#1c2533"
+        cellColor={gridConfig.cellColor}
         sectionSize={4.0}
         sectionThickness={0.8}
-        sectionColor="#253244"
+        sectionColor={gridConfig.sectionColor}
         fadeDistance={18}
         fadeStrength={1.8}
       />

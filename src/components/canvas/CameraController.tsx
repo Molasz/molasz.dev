@@ -1,87 +1,110 @@
-import React, { useRef } from 'react'
+import React, { useRef, useEffect } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib'
-
-export type ViewPreset = 'overview' | 'laptop' | 'instruments' | 'pcb' | 'soldering'
+import { type ViewPreset, VIEW_CONFIGS } from '../../types/lab'
 
 interface CameraControllerProps {
   view: ViewPreset
   controlsRef: React.RefObject<OrbitControlsImpl | null>
+  autoTour?: boolean
+  onViewChange?: (view: ViewPreset) => void
 }
 
-const VIEW_CONFIGS: Record<ViewPreset, { pos: [number, number, number]; target: [number, number, number] }> = {
-  overview: {
-    pos: [0, 1.85, 3.10],
-    target: [0, 0.98, -0.05],
-  },
-  laptop: {
-    pos: [-0.68, 1.15, 0.52],
-    target: [-0.68, 0.94, 0.08],
-  },
-  instruments: {
-    pos: [-0.18, 1.65, 0.40],
-    target: [-0.20, 1.46, -0.32],
-  },
-  pcb: {
-    pos: [-0.05, 1.25, 0.35],
-    target: [-0.05, 0.88, -0.04],
-  },
-  soldering: {
-    pos: [0.72, 1.18, 0.38],
-    target: [0.72, 0.94, -0.08],
-  },
-}
-
-export const CameraController: React.FC<CameraControllerProps> = ({ view, controlsRef }) => {
+export const CameraController: React.FC<CameraControllerProps> = ({
+  view,
+  controlsRef,
+  autoTour = false,
+  onViewChange,
+}) => {
   const { camera, size } = useThree()
   const targetPos = useRef(new THREE.Vector3())
   const targetLookAt = useRef(new THREE.Vector3())
   const isTransitioning = useRef(true)
-  const currentView = useRef(view)
+  const autoTourTimer = useRef(0)
+  const tourIndex = useRef(0)
 
-  if (currentView.current !== view) {
-    currentView.current = view
+  useEffect(() => {
     isTransitioning.current = true
-  }
+  }, [view])
 
-  useFrame(() => {
+  useEffect(() => {
+    const controls = controlsRef.current
+    if (!controls) return
+
+    const handleUserInteraction = () => {
+      isTransitioning.current = false
+    }
+
+    controls.addEventListener('start', handleUserInteraction)
+    return () => {
+      controls.removeEventListener('start', handleUserInteraction)
+    }
+  }, [controlsRef])
+
+  useFrame((_, delta) => {
+    if (autoTour) {
+      autoTourTimer.current += delta
+      if (autoTourTimer.current > 7.0) {
+        autoTourTimer.current = 0
+        const tourPresets: ViewPreset[] = ['overview', 'laptop', 'pcb', 'instruments', 'soldering', 'pegboard']
+        tourIndex.current = (tourIndex.current + 1) % tourPresets.length
+        const nextView = tourPresets[tourIndex.current]
+        if (onViewChange) {
+          onViewChange(nextView)
+        }
+      }
+    }
+
+    if (!isTransitioning.current) {
+      if (autoTour && controlsRef.current) {
+        controlsRef.current.autoRotate = true
+        controlsRef.current.autoRotateSpeed = 0.6
+      } else if (controlsRef.current) {
+        controlsRef.current.autoRotate = false
+      }
+      return
+    }
+
+    if (controlsRef.current) {
+      controlsRef.current.autoRotate = false
+    }
+
     const aspect = size.width / Math.max(1, size.height)
     const config = VIEW_CONFIGS[view]
 
-    // Calculate responsive camera position based on screen aspect ratio
     let [px, py, pz] = config.pos
     if (view === 'overview') {
       if (aspect < 1.0) {
-        // Mobile portrait: pull back to keep the whole workbench in view
         const factor = Math.min(2.4, 1.6 / aspect)
         py = 1.85 + factor * 0.25
         pz = 2.80 * factor
       } else if (aspect < 1.6) {
-        // Tablet / 4:3 screens
         const factor = 1.6 / aspect
         py = 1.85 + (factor - 1) * 0.15
         pz = 3.10 * factor
+      }
+    } else if (view === 'topdown') {
+      if (aspect < 1.0) {
+        py = 3.6
       }
     }
 
     targetPos.current.set(px, py, pz)
     targetLookAt.current.set(...config.target)
 
-    if (isTransitioning.current) {
-      camera.position.lerp(targetPos.current, 0.07)
+    camera.position.lerp(targetPos.current, 0.075)
 
-      if (controlsRef.current) {
-        controlsRef.current.target.lerp(targetLookAt.current, 0.07)
-        controlsRef.current.update()
-      }
+    if (controlsRef.current) {
+      controlsRef.current.target.lerp(targetLookAt.current, 0.075)
+      controlsRef.current.update()
+    }
 
-      if (
-        camera.position.distanceTo(targetPos.current) < 0.01 &&
-        (controlsRef.current ? controlsRef.current.target.distanceTo(targetLookAt.current) < 0.01 : true)
-      ) {
-        isTransitioning.current = false
-      }
+    if (
+      camera.position.distanceTo(targetPos.current) < 0.025 &&
+      (controlsRef.current ? controlsRef.current.target.distanceTo(targetLookAt.current) < 0.025 : true)
+    ) {
+      isTransitioning.current = false
     }
   })
 

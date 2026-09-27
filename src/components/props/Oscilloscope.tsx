@@ -1,21 +1,42 @@
-import React, { useMemo, useState, useRef, useEffect } from 'react'
+import React, { useState, useRef, useEffect, useMemo } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
+import { soundFx } from '../../utils/sound'
 
 interface OscilloscopeProps {
   position?: [number, number, number]
   rotation?: [number, number, number]
   scale?: number
+  soundEnabled?: boolean
+  mode?: number
+  onModeChange?: (mode: number) => void
 }
 
 export const Oscilloscope: React.FC<OscilloscopeProps> = ({
   position = [0, 0, 0],
   rotation = [0, 0, 0],
   scale = 1,
+  soundEnabled = true,
+  mode: externalMode,
+  onModeChange,
 }) => {
-  const [mode, setMode] = useState(0)
+  const [internalMode, setInternalMode] = useState(0)
+  const currentMode = externalMode !== undefined ? externalMode : internalMode
   const [knobRot, setKnobRot] = useState(0)
   const [hovered, setHovered] = useState(false)
+
+  const timebaseKnobRef = useRef<THREE.Mesh>(null)
+  const ch1KnobRef = useRef<THREE.Mesh>(null)
+  const ch2KnobRef = useRef<THREE.Mesh>(null)
+  const textureRef = useRef<THREE.CanvasTexture>(null)
+  const currentKnobAngle = useRef(0)
+
+  const canvas = useMemo(() => {
+    const c = document.createElement('canvas')
+    c.width = 256
+    c.height = 160
+    return c
+  }, [])
 
   useEffect(() => {
     document.body.style.cursor = hovered ? 'pointer' : 'auto'
@@ -23,22 +44,6 @@ export const Oscilloscope: React.FC<OscilloscopeProps> = ({
       document.body.style.cursor = 'auto'
     }
   }, [hovered])
-
-  const timebaseKnobRef = useRef<THREE.Mesh>(null)
-  const ch1KnobRef = useRef<THREE.Mesh>(null)
-  const ch2KnobRef = useRef<THREE.Mesh>(null)
-  const currentKnobAngle = useRef(0)
-
-  const { ctx, screenTexture } = useMemo(() => {
-    const c = document.createElement('canvas')
-    c.width = 256
-    c.height = 160
-    const context = c.getContext('2d')
-    const tex = new THREE.CanvasTexture(c)
-    tex.minFilter = THREE.NearestFilter
-    tex.magFilter = THREE.NearestFilter
-    return { ctx: context, screenTexture: tex }
-  }, [])
 
   const timeRef = useRef(0)
   const lastUpdate = useRef(0)
@@ -51,105 +56,117 @@ export const Oscilloscope: React.FC<OscilloscopeProps> = ({
     if (ch1KnobRef.current) ch1KnobRef.current.rotation.y = -currentKnobAngle.current * 0.8
     if (ch2KnobRef.current) ch2KnobRef.current.rotation.y = currentKnobAngle.current * 1.2
 
-    if (ctx && timeRef.current - lastUpdate.current > 0.03) {
+    if (timeRef.current - lastUpdate.current > 0.03) {
       lastUpdate.current = timeRef.current
       const t = timeRef.current
+      const activeM = currentMode
+      const ctx = canvas.getContext('2d')
 
-      // Outer Wilds scientific CRT display
-      ctx.fillStyle = '#0a1018'
-      ctx.fillRect(0, 0, 256, 160)
+      if (ctx) {
+        // Scientific CRT display
+        ctx.fillStyle = '#0a1018'
+        ctx.fillRect(0, 0, 256, 160)
 
-      // Graticule grid
-      ctx.strokeStyle = '#14202d'
-      ctx.lineWidth = 1
-      for (let x = 0; x <= 256; x += 32) {
-        ctx.beginPath()
-        ctx.moveTo(x, 0)
-        ctx.lineTo(x, 160)
-        ctx.stroke()
-      }
-      for (let y = 0; y <= 160; y += 20) {
-        ctx.beginPath()
-        ctx.moveTo(0, y)
-        ctx.lineTo(256, y)
-        ctx.stroke()
-      }
-
-      const modes = [
-        { name: '48.00 MHz', ch1: '1.00V', ch2: '3.30V' },
-        { name: 'SOLAR PK', ch1: '500mV', ch2: '1.80V' },
-        { name: 'HARMONIC', ch1: '2.00V', ch2: '5.00V' },
-        { name: 'BEACON', ch1: '3.30V', ch2: '3.30V' },
-      ]
-      const curMode = modes[mode % modes.length]
-
-      ctx.fillStyle = '#10b981'
-      ctx.font = 'bold 9px monospace'
-      ctx.fillText(`SIGNAL SCOPE: ${curMode.name}`, 10, 12)
-
-      // CH1 Waveform (Amber Ember)
-      ctx.strokeStyle = '#d97706'
-      ctx.lineWidth = 2
-      ctx.beginPath()
-      for (let px = 0; px <= 256; px += 3) {
-        let py = 68
-        if (mode === 0) {
-          py += Math.sin(px * 0.06 - t * 6) * 30
-        } else if (mode === 1) {
-          py += Math.sin(px * 0.18 - t * 14) * 24
-        } else if (mode === 2) {
-          const phase = ((px * 0.04 - t * 4) % 2 + 2) % 2
-          py += (phase < 1 ? phase * 2 - 1 : (2 - phase) * 2 - 1) * 32
-        } else {
-          py += Math.sin(px * 0.04 - t * 4) * Math.cos(px * 0.12 - t * 8) * 32
+        // Graticule grid
+        ctx.strokeStyle = '#14202d'
+        ctx.lineWidth = 1
+        for (let x = 0; x <= 256; x += 32) {
+          ctx.beginPath()
+          ctx.moveTo(x, 0)
+          ctx.lineTo(x, 160)
+          ctx.stroke()
+        }
+        for (let y = 0; y <= 160; y += 20) {
+          ctx.beginPath()
+          ctx.moveTo(0, y)
+          ctx.lineTo(256, y)
+          ctx.stroke()
         }
 
-        if (px === 0) ctx.moveTo(px, py)
-        else ctx.lineTo(px, py)
-      }
-      ctx.stroke()
+        const modes = [
+          { name: '48.00 MHz', ch1: '1.00V', ch2: '3.30V' },
+          { name: 'SOLAR PK', ch1: '500mV', ch2: '1.80V' },
+          { name: 'HARMONIC', ch1: '2.00V', ch2: '5.00V' },
+          { name: 'BEACON', ch1: '3.30V', ch2: '3.30V' },
+        ]
+        const curMode = modes[activeM % modes.length]
 
-      // CH2 Waveform (Cyan Starfield)
-      ctx.strokeStyle = '#0d9488'
-      ctx.lineWidth = 1.8
-      ctx.beginPath()
-      for (let px = 0; px <= 256; px += 2) {
-        let py = 120
-        if (mode === 0 || mode === 1) {
-          const cycle = Math.floor((px - t * 60) / 24) % 2
-          py += (cycle === 0 ? -18 : 18)
-        } else if (mode === 2) {
-          py += Math.sin(px * 0.08 - t * 8) * 20
-        } else {
-          const saw = ((px * 0.03 - t * 3) % 1 + 1) % 1
-          py += (saw * 2 - 1) * 20
+        ctx.fillStyle = '#10b981'
+        ctx.font = 'bold 9px monospace'
+        ctx.fillText(`SIGNAL SCOPE: ${curMode.name}`, 10, 12)
+
+        // CH1 Waveform
+        ctx.strokeStyle = '#d97706'
+        ctx.lineWidth = 2
+        ctx.beginPath()
+        for (let px = 0; px <= 256; px += 3) {
+          let py = 68
+          if (activeM === 0) {
+            py += Math.sin(px * 0.06 - t * 6) * 30
+          } else if (activeM === 1) {
+            py += Math.sin(px * 0.18 - t * 14) * 24
+          } else if (activeM === 2) {
+            const phase = ((px * 0.04 - t * 4) % 2 + 2) % 2
+            py += (phase < 1 ? phase * 2 - 1 : (2 - phase) * 2 - 1) * 32
+          } else {
+            py += Math.sin(px * 0.04 - t * 4) * Math.cos(px * 0.12 - t * 8) * 32
+          }
+
+          if (px === 0) ctx.moveTo(px, py)
+          else ctx.lineTo(px, py)
         }
+        ctx.stroke()
 
-        if (px === 0) ctx.moveTo(px, py)
-        else ctx.lineTo(px, py)
+        // CH2 Waveform
+        ctx.strokeStyle = '#0d9488'
+        ctx.lineWidth = 1.8
+        ctx.beginPath()
+        for (let px = 0; px <= 256; px += 2) {
+          let py = 120
+          if (activeM === 0 || activeM === 1) {
+            const cycle = Math.floor((px - t * 60) / 24) % 2
+            py += (cycle === 0 ? -18 : 18)
+          } else if (activeM === 2) {
+            py += Math.sin(px * 0.08 - t * 8) * 20
+          } else {
+            const saw = ((px * 0.03 - t * 3) % 1 + 1) % 1
+            py += (saw * 2 - 1) * 20
+          }
+
+          if (px === 0) ctx.moveTo(px, py)
+          else ctx.lineTo(px, py)
+        }
+        ctx.stroke()
+
+        // Badges
+        ctx.fillStyle = '#9a3412'
+        ctx.fillRect(8, 144, 46, 12)
+        ctx.fillStyle = '#ffffff'
+        ctx.font = 'bold 8px monospace'
+        ctx.fillText(`1 ${curMode.ch1}`, 12, 153)
+
+        ctx.fillStyle = '#1b4d3e'
+        ctx.fillRect(58, 144, 46, 12)
+        ctx.fillStyle = '#ffffff'
+        ctx.fillText(`2 ${curMode.ch2}`, 62, 153)
+
+        if (textureRef.current) {
+          textureRef.current.needsUpdate = true
+        }
       }
-      ctx.stroke()
-
-      // Badges
-      ctx.fillStyle = '#9a3412'
-      ctx.fillRect(8, 144, 46, 12)
-      ctx.fillStyle = '#ffffff'
-      ctx.font = 'bold 8px monospace'
-      ctx.fillText(`1 ${curMode.ch1}`, 12, 153)
-
-      ctx.fillStyle = '#1b4d3e'
-      ctx.fillRect(58, 144, 46, 12)
-      ctx.fillStyle = '#ffffff'
-      ctx.fillText(`2 ${curMode.ch2}`, 62, 153)
-
-      screenTexture.needsUpdate = true
     }
   })
 
   const handleClick = (e: { stopPropagation: () => void }) => {
     e.stopPropagation()
-    setMode((prev) => (prev + 1) % 4)
+    const next = (currentMode + 1) % 4
+    if (onModeChange) {
+      onModeChange(next)
+    } else {
+      setInternalMode(next)
+    }
     setKnobRot((prev) => prev + Math.PI / 4)
+    soundFx.scopeBeep(soundEnabled)
   }
 
   const width = 0.38
@@ -168,7 +185,7 @@ export const Oscilloscope: React.FC<OscilloscopeProps> = ({
       }}
       onPointerOut={() => setHovered(false)}
     >
-      {/* Outer Enclosure (Parchment Stoneware Finish with Ventilation Louvers) */}
+      {/* Outer Enclosure */}
       <mesh position={[0, height / 2, 0]} castShadow receiveShadow>
         <boxGeometry args={[width, height, depth]} />
         <meshStandardMaterial
@@ -179,7 +196,7 @@ export const Oscilloscope: React.FC<OscilloscopeProps> = ({
         />
       </mesh>
 
-      {/* Top Leather / Brass Carrying Handle */}
+      {/* Top Carrying Handle */}
       <group position={[0, height + 0.012, 0]}>
         <mesh castShadow>
           <boxGeometry args={[0.16, 0.008, 0.02]} />
@@ -218,7 +235,9 @@ export const Oscilloscope: React.FC<OscilloscopeProps> = ({
       {/* TFT Display Panel */}
       <mesh position={[-0.05, height / 2 + 0.01, depth / 2 + 0.011]}>
         <planeGeometry args={[0.22, 0.15]} />
-        <meshBasicMaterial map={screenTexture} toneMapped={false} />
+        <meshBasicMaterial toneMapped={false}>
+          <canvasTexture ref={textureRef} attach="map" image={canvas} />
+        </meshBasicMaterial>
       </mesh>
 
       {/* Side Protective Armor Bumpers */}
@@ -231,7 +250,7 @@ export const Oscilloscope: React.FC<OscilloscopeProps> = ({
         <meshStandardMaterial color="#2d3d4e" roughness={0.65} flatShading />
       </mesh>
 
-      {/* Animated Timebase Dial (Knurled Brass) */}
+      {/* Animated Timebase Dial */}
       <mesh
         ref={timebaseKnobRef}
         position={[0.11, height / 2 + 0.045, depth / 2 + 0.02]}
@@ -242,7 +261,7 @@ export const Oscilloscope: React.FC<OscilloscopeProps> = ({
         <meshStandardMaterial color="#b5935b" metalness={0.8} roughness={0.3} flatShading />
       </mesh>
 
-      {/* Channel Knobs with Indicator Pointers */}
+      {/* Channel Knobs */}
       <mesh
         ref={ch1KnobRef}
         position={[0.08, height / 2 - 0.01, depth / 2 + 0.02]}
@@ -262,7 +281,7 @@ export const Oscilloscope: React.FC<OscilloscopeProps> = ({
         <meshStandardMaterial color="#1b4d3e" roughness={0.45} flatShading />
       </mesh>
 
-      {/* 4 Brass BNC Channel Inputs with Bayonet Pins */}
+      {/* 4 Brass BNC Channel Inputs */}
       {[-0.03, 0.02, 0.07, 0.12].map((bx, idx) => (
         <group key={idx} position={[bx, 0.035, depth / 2 + 0.016]}>
           <mesh rotation={[Math.PI / 2, 0, 0]} castShadow>

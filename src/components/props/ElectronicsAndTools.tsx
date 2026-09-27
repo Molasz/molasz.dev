@@ -2,20 +2,29 @@ import React, { useMemo, useState, useRef, useEffect } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 import { getPcbTexture } from '../../utils/textures'
+import { soundFx } from '../../utils/sound'
 
 interface ToolsProps {
   position?: [number, number, number]
   rotation?: [number, number, number]
   scale?: number
+  soundEnabled?: boolean
+  pcbActive?: boolean
+  onPcbToggle?: () => void
 }
 
 export const ElectronicsAndTools: React.FC<ToolsProps> = ({
   position = [0, 0, 0],
   rotation = [0, 0, 0],
   scale = 1,
+  soundEnabled = true,
+  pcbActive: externalPcbActive,
+  onPcbToggle,
 }) => {
   const pcbTexture = useMemo(() => getPcbTexture(), [])
-  const [pcbActive, setPcbActive] = useState(false)
+  const [internalPcbActive, setInternalPcbActive] = useState(false)
+  const isPcbActive = externalPcbActive !== undefined ? externalPcbActive : internalPcbActive
+
   const [mugWobble, setMugWobble] = useState(false)
   const [hovered, setHovered] = useState(false)
 
@@ -31,9 +40,14 @@ export const ElectronicsAndTools: React.FC<ToolsProps> = ({
   const wobbleVel = useRef(0)
   const timeRef = useRef(0)
 
+  const ledGreenRef = useRef<THREE.MeshStandardMaterial>(null)
+  const ledBlueRef = useRef<THREE.MeshStandardMaterial>(null)
+
   useFrame((_, delta) => {
     timeRef.current += delta
+    const t = timeRef.current
 
+    // Mug wobble
     const targetAngle = mugWobble ? 0.15 : 0
     const force = (targetAngle - wobbleAngle.current) * 30 - wobbleVel.current * 8
     wobbleVel.current += force * delta
@@ -44,7 +58,36 @@ export const ElectronicsAndTools: React.FC<ToolsProps> = ({
     if (mugWobble && Math.abs(wobbleAngle.current) > 0.1) {
       setMugWobble(false)
     }
+
+    // Dynamic LED pulsing
+    if (ledGreenRef.current) {
+      ledGreenRef.current.emissiveIntensity = isPcbActive
+        ? (Math.sin(t * 12) > 0 ? 2.2 : 0.2)
+        : 0.8
+    }
+    if (ledBlueRef.current) {
+      ledBlueRef.current.emissiveIntensity = isPcbActive
+        ? (Math.sin(t * 12 + 1.5) > 0 ? 2.2 : 0.2)
+        : 0.3
+    }
   })
+
+  const handlePcbClick = (e: { stopPropagation: () => void }) => {
+    e.stopPropagation()
+    if (onPcbToggle) {
+      onPcbToggle()
+    } else {
+      setInternalPcbActive((prev) => !prev)
+    }
+    soundFx.click(soundEnabled)
+  }
+
+  const handleMugClick = (e: { stopPropagation: () => void }) => {
+    e.stopPropagation()
+    wobbleVel.current = 1.8
+    setMugWobble(true)
+    soundFx.click(soundEnabled)
+  }
 
   return (
     <group position={position} rotation={rotation} scale={scale}>
@@ -52,10 +95,7 @@ export const ElectronicsAndTools: React.FC<ToolsProps> = ({
       <group
         position={[-0.05, 0.005, 0]}
         rotation={[0, 0.15, 0]}
-        onClick={(e) => {
-          e.stopPropagation()
-          setPcbActive((prev) => !prev)
-        }}
+        onClick={handlePcbClick}
         onPointerOver={(e) => {
           e.stopPropagation()
           setHovered(true)
@@ -110,18 +150,20 @@ export const ElectronicsAndTools: React.FC<ToolsProps> = ({
         <mesh position={[0.03, 0.0045, 0.03]}>
           <boxGeometry args={[0.006, 0.004, 0.004]} />
           <meshStandardMaterial
+            ref={ledGreenRef}
             color="#34d399"
             emissive="#10b981"
-            emissiveIntensity={pcbActive ? (Math.sin(timeRef.current * 12) > 0 ? 2.0 : 0.2) : 1.0}
+            emissiveIntensity={1.0}
             flatShading
           />
         </mesh>
         <mesh position={[0.03, 0.0045, 0.042]}>
           <boxGeometry args={[0.006, 0.004, 0.004]} />
           <meshStandardMaterial
+            ref={ledBlueRef}
             color="#38bdf8"
             emissive="#38bdf8"
-            emissiveIntensity={pcbActive ? (Math.sin(timeRef.current * 12 + 1.5) > 0 ? 2.0 : 0.2) : 0.4}
+            emissiveIntensity={0.4}
             flatShading
           />
         </mesh>
@@ -131,11 +173,7 @@ export const ElectronicsAndTools: React.FC<ToolsProps> = ({
       <group
         ref={mugRef}
         position={[0.82, 0, 0.26]}
-        onClick={(e) => {
-          e.stopPropagation()
-          wobbleVel.current = 1.8
-          setMugWobble(true)
-        }}
+        onClick={handleMugClick}
         onPointerOver={(e) => {
           e.stopPropagation()
           setHovered(true)
@@ -154,7 +192,7 @@ export const ElectronicsAndTools: React.FC<ToolsProps> = ({
             flatShading
           />
         </mesh>
-        {/* Hot Campfire Brew Coffee */}
+        {/* Coffee */}
         <mesh position={[0, 0.082, 0]}>
           <cylinderGeometry args={[0.036, 0.036, 0.002, 6]} />
           <meshStandardMaterial color="#2d1a10" roughness={0.3} flatShading />

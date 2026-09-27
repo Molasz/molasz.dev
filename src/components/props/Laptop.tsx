@@ -1,21 +1,33 @@
-import React, { useMemo, useState, useRef, useEffect } from 'react'
+import React, { useState, useRef, useEffect, useMemo } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
+import { soundFx } from '../../utils/sound'
 
 interface LaptopProps {
   position?: [number, number, number]
   rotation?: [number, number, number]
   scale?: number
+  soundEnabled?: boolean
+  onOpenProjects?: () => void
 }
 
 export const Laptop: React.FC<LaptopProps> = ({
   position = [0, 0, 0],
   rotation = [0, 0, 0],
   scale = 1,
+  soundEnabled = true,
+  onOpenProjects,
 }) => {
-  const [buildCount, setBuildCount] = useState(0)
-  const [isBuilding, setIsBuilding] = useState(false)
   const [hovered, setHovered] = useState(false)
+
+  const canvas = useMemo(() => {
+    const c = document.createElement('canvas')
+    c.width = 512
+    c.height = 320
+    return c
+  }, [])
+
+  const textureRef = useRef<THREE.CanvasTexture>(null)
 
   useEffect(() => {
     document.body.style.cursor = hovered ? 'pointer' : 'auto'
@@ -30,21 +42,10 @@ export const Laptop: React.FC<LaptopProps> = ({
   const tiltAngle = useRef(baseAngle)
   const tiltVel = useRef(0)
 
-  // 2D Canvas setup for live coding & build logs
-  const { ctx, screenTexture } = useMemo(() => {
-    const c = document.createElement('canvas')
-    c.width = 512
-    c.height = 320
-    const context = c.getContext('2d')
-    const tex = new THREE.CanvasTexture(c)
-    tex.minFilter = THREE.LinearFilter
-    tex.magFilter = THREE.LinearFilter
-    return { ctx: context, screenTexture: tex }
-  }, [])
-
   const timeRef = useRef(0)
   const buildStartTime = useRef(-10)
   const lastCanvasUpdate = useRef(0)
+  const buildCount = useRef(0)
 
   useFrame((_, delta) => {
     timeRef.current += delta
@@ -59,141 +60,147 @@ export const Laptop: React.FC<LaptopProps> = ({
       lidRef.current.rotation.x = tiltAngle.current
     }
 
-    if (ctx && timeRef.current - lastCanvasUpdate.current > 0.035) {
+    if (timeRef.current - lastCanvasUpdate.current > 0.035) {
       lastCanvasUpdate.current = timeRef.current
       const t = timeRef.current
+      const currentBuild = buildCount.current
+      const ctx = canvas.getContext('2d')
 
-      // Editor Background
-      ctx.fillStyle = '#0f1722'
-      ctx.fillRect(0, 0, 512, 320)
+      if (ctx) {
+        // Editor Background
+        ctx.fillStyle = '#0f1722'
+        ctx.fillRect(0, 0, 512, 320)
 
-      // Top Title Bar
-      ctx.fillStyle = '#172230'
-      ctx.fillRect(0, 0, 512, 26)
+        // Top Title Bar
+        ctx.fillStyle = '#172230'
+        ctx.fillRect(0, 0, 512, 26)
 
-      // Window Dots
-      ctx.fillStyle = '#9a3412'
-      ctx.beginPath()
-      ctx.arc(14, 13, 3.5, 0, Math.PI * 2)
-      ctx.fill()
-      ctx.fillStyle = '#b45309'
-      ctx.beginPath()
-      ctx.arc(26, 13, 3.5, 0, Math.PI * 2)
-      ctx.fill()
-      ctx.fillStyle = '#2d5a3f'
-      ctx.beginPath()
-      ctx.arc(38, 13, 3.5, 0, Math.PI * 2)
-      ctx.fill()
+        // Window Dots
+        ctx.fillStyle = '#9a3412'
+        ctx.beginPath()
+        ctx.arc(14, 13, 3.5, 0, Math.PI * 2)
+        ctx.fill()
+        ctx.fillStyle = '#b45309'
+        ctx.beginPath()
+        ctx.arc(26, 13, 3.5, 0, Math.PI * 2)
+        ctx.fill()
+        ctx.fillStyle = '#2d5a3f'
+        ctx.beginPath()
+        ctx.arc(38, 13, 3.5, 0, Math.PI * 2)
+        ctx.fill()
 
-      // Tab Header
-      ctx.fillStyle = '#0f1722'
-      ctx.fillRect(54, 4, 150, 22)
-      ctx.fillStyle = '#d8d2c4'
-      ctx.font = 'bold 10px monospace'
-      ctx.fillText('⚡ firmware_core.c', 64, 18)
-
-      // Typing loop simulation
-      const typingPhrases = [
-        'Telemetry_Broadcast(freq);',
-        'Signal_Filter_FIR(&input);',
-        'PWM_SetDutyCycle(75);     ',
-        'Status_LED_Heartbeat();   ',
-      ]
-      const phraseIdx = Math.floor(t / 4) % typingPhrases.length
-      const charCount = Math.min(
-        typingPhrases[phraseIdx].length,
-        Math.floor(((t % 4) / 2.5) * typingPhrases[phraseIdx].length)
-      )
-      const currentTypingText = typingPhrases[phraseIdx].substring(0, charCount)
-      const cursor = Math.floor(t * 3) % 2 === 0 ? '█' : ' '
-
-      const codeLines = [
-        { num: '01', text: '#include <cortex_m7.h>', col: '#a78bfa' },
-        { num: '02', text: '#include "observatory.h"', col: '#a78bfa' },
-        { num: '03', text: '', col: '#fff' },
-        { num: '04', text: 'void System_Init(void) {', col: '#93c5fd' },
-        { num: '05', text: '  Clock_Config(216MHz);', col: '#38bdf8' },
-        { num: '06', text: '  Radio_Attach(CH1, CH2);', col: '#6ee7b7' },
-        { num: '07', text: '}', col: '#93c5fd' },
-        { num: '08', text: '', col: '#fff' },
-        { num: '09', text: 'int main(void) {', col: '#93c5fd' },
-        { num: '10', text: '  System_Init();', col: '#38bdf8' },
-        { num: '11', text: `    ${currentTypingText}${cursor}`, col: '#fcd34d' },
-        { num: '12', text: '}', col: '#93c5fd' },
-      ]
-
-      let y = 46
-      codeLines.forEach((l) => {
-        ctx.fillStyle = '#334155'
-        ctx.font = '10px monospace'
-        ctx.fillText(l.num, 12, y)
-
-        ctx.fillStyle = l.col
-        ctx.font = 'bold 11px monospace'
-        ctx.fillText(l.text, 36, y)
-        y += 14
-      })
-
-      // Interactive Build Terminal
-      const buildElapsed = t - buildStartTime.current
-      const isCurrentlyBuilding = buildElapsed < 2.4 && buildStartTime.current > 0
-
-      if (isCurrentlyBuilding || buildCount > 0) {
-        ctx.fillStyle = '#090e15'
-        ctx.fillRect(0, 195, 512, 125)
-        ctx.strokeStyle = '#1e2837'
-        ctx.strokeRect(0, 195, 512, 1)
-
-        ctx.fillStyle = '#38bdf8'
+        // Tab Header
+        ctx.fillStyle = '#0f1722'
+        ctx.fillRect(54, 4, 150, 22)
+        ctx.fillStyle = '#d8d2c4'
         ctx.font = 'bold 10px monospace'
-        ctx.fillText(`[molasz@dev ~]$ make flash-target --release (Build #${buildCount})`, 14, 214)
+        ctx.fillText('⚡ firmware_core.c', 64, 18)
 
-        const progress = Math.min(1.0, buildElapsed / 1.8)
-        const percent = Math.floor(progress * 100)
+        // Typing loop simulation
+        const typingPhrases = [
+          'Telemetry_Broadcast(freq);',
+          'Signal_Filter_FIR(&input);',
+          'PWM_SetDutyCycle(75);     ',
+          'Status_LED_Heartbeat();   ',
+        ]
+        const phraseIdx = Math.floor(t / 4) % typingPhrases.length
+        const charCount = Math.min(
+          typingPhrases[phraseIdx].length,
+          Math.floor(((t % 4) / 2.5) * typingPhrases[phraseIdx].length)
+        )
+        const currentTypingText = typingPhrases[phraseIdx].substring(0, charCount)
+        const cursor = Math.floor(t * 3) % 2 === 0 ? '█' : ' '
 
-        if (progress < 0.35) {
-          ctx.fillStyle = '#94a3b8'
-          ctx.fillText(`[1/3] Compiling firmware_core.c & hal_driver.c...`, 14, 234)
-        } else if (progress < 0.8) {
-          ctx.fillStyle = '#94a3b8'
-          ctx.fillText(`[2/3] Linking firmware.elf (Flash: 34.2 KB)...`, 14, 234)
-          ctx.fillStyle = '#fbbf24'
-          ctx.fillText(`Optimizations: -O3 • Architecture: ARM Cortex-M7`, 14, 250)
+        const codeLines = [
+          { num: '01', text: '#include <cortex_m7.h>', col: '#a78bfa' },
+          { num: '02', text: '#include "observatory.h"', col: '#a78bfa' },
+          { num: '03', text: '', col: '#fff' },
+          { num: '04', text: 'void System_Init(void) {', col: '#93c5fd' },
+          { num: '05', text: '  Clock_Config(216MHz);', col: '#38bdf8' },
+          { num: '06', text: '  Radio_Attach(CH1, CH2);', col: '#6ee7b7' },
+          { num: '07', text: '}', col: '#93c5fd' },
+          { num: '08', text: '', col: '#fff' },
+          { num: '09', text: 'int main(void) {', col: '#93c5fd' },
+          { num: '10', text: '  System_Init();', col: '#38bdf8' },
+          { num: '11', text: `    ${currentTypingText}${cursor}`, col: '#fcd34d' },
+          { num: '12', text: '}', col: '#93c5fd' },
+        ]
+
+        let y = 46
+        codeLines.forEach((l) => {
+          ctx.fillStyle = '#334155'
+          ctx.font = '10px monospace'
+          ctx.fillText(l.num, 12, y)
+
+          ctx.fillStyle = l.col
+          ctx.font = 'bold 11px monospace'
+          ctx.fillText(l.text, 36, y)
+          y += 14
+        })
+
+        // Interactive Build Terminal
+        const buildElapsed = t - buildStartTime.current
+        const isCurrentlyBuilding = buildElapsed < 2.4 && buildStartTime.current > 0
+
+        if (isCurrentlyBuilding || currentBuild > 0) {
+          ctx.fillStyle = '#090e15'
+          ctx.fillRect(0, 195, 512, 125)
+          ctx.strokeStyle = '#1e2837'
+          ctx.strokeRect(0, 195, 512, 1)
+
+          ctx.fillStyle = '#38bdf8'
+          ctx.font = 'bold 10px monospace'
+          ctx.fillText(`[molasz@dev ~]$ make flash-target --release (Build #${currentBuild})`, 14, 214)
+
+          const progress = Math.min(1.0, buildElapsed / 1.8)
+          const percent = Math.floor(progress * 100)
+
+          if (progress < 0.35) {
+            ctx.fillStyle = '#94a3b8'
+            ctx.fillText(`[1/3] Compiling firmware_core.c & hal_driver.c...`, 14, 234)
+          } else if (progress < 0.8) {
+            ctx.fillStyle = '#94a3b8'
+            ctx.fillText(`[2/3] Linking firmware.elf (Flash: 34.2 KB)...`, 14, 234)
+            ctx.fillStyle = '#fbbf24'
+            ctx.fillText(`Optimizations: -O3 • Architecture: ARM Cortex-M7`, 14, 250)
+          } else {
+            ctx.fillStyle = '#34d399'
+            ctx.fillText(`[3/3] ✓ FLASH VERIFIED! Target running firmware #${currentBuild}`, 14, 234)
+            ctx.fillText(`⚡ Output: 0 errors, 0 warnings (0.38s)`, 14, 250)
+          }
+
+          ctx.fillStyle = '#1e293b'
+          ctx.fillRect(14, 268, 484, 8)
+          ctx.fillStyle = progress >= 1.0 ? '#2d5a3f' : '#b45309'
+          ctx.fillRect(14, 268, Math.min(484, 484 * progress), 8)
+
+          ctx.fillStyle = '#64748b'
+          ctx.font = '9px monospace'
+          ctx.fillText(
+            progress >= 1.0
+              ? `[✓ Build finalitzada • Fes clic per compilar de nou]`
+              : `[Compilant... ${percent}%]`,
+            14,
+            296
+          )
         } else {
-          ctx.fillStyle = '#34d399'
-          ctx.fillText(`[3/3] ✓ FLASH VERIFIED! Target running firmware #${buildCount}`, 14, 234)
-          ctx.fillText(`⚡ Output: 0 errors, 0 warnings (0.38s)`, 14, 250)
+          ctx.fillStyle = '#0c121a'
+          ctx.fillRect(0, 280, 512, 40)
+          ctx.strokeStyle = '#1e2837'
+          ctx.strokeRect(0, 280, 512, 1)
+
+          ctx.fillStyle = '#64748b'
+          ctx.font = '10px monospace'
+          ctx.fillText('● Ready  |  UTF-8  |  Cortex-M7  |  molasz.dev', 14, 298)
+
+          ctx.fillStyle = '#38bdf8'
+          ctx.fillText('[Fes clic per compilar / obrir projectes]', 270, 298)
         }
 
-        ctx.fillStyle = '#1e293b'
-        ctx.fillRect(14, 268, 484, 8)
-        ctx.fillStyle = progress >= 1.0 ? '#2d5a3f' : '#b45309'
-        ctx.fillRect(14, 268, Math.min(484, 484 * progress), 8)
-
-        ctx.fillStyle = '#64748b'
-        ctx.font = '9px monospace'
-        ctx.fillText(
-          progress >= 1.0
-            ? `[✓ Build finalitzada • Fes clic per llançar una nova build]`
-            : `[Compilant... ${percent}%]`,
-          14,
-          296
-        )
-      } else {
-        ctx.fillStyle = '#0c121a'
-        ctx.fillRect(0, 280, 512, 40)
-        ctx.strokeStyle = '#1e2837'
-        ctx.strokeRect(0, 280, 512, 1)
-
-        ctx.fillStyle = '#64748b'
-        ctx.font = '10px monospace'
-        ctx.fillText('● Ready  |  UTF-8  |  Cortex-M7  |  molasz.dev', 14, 298)
-
-        ctx.fillStyle = '#38bdf8'
-        ctx.fillText('[Fes clic per compilar]', 330, 298)
+        if (textureRef.current) {
+          textureRef.current.needsUpdate = true
+        }
       }
-
-      screenTexture.needsUpdate = true
     }
   })
 
@@ -201,8 +208,11 @@ export const Laptop: React.FC<LaptopProps> = ({
     e.stopPropagation()
     tiltVel.current = 1.6
     buildStartTime.current = timeRef.current
-    setIsBuilding(true)
-    setBuildCount((prev) => prev + 1)
+    buildCount.current += 1
+    soundFx.keyboardKey(soundEnabled)
+    if (onOpenProjects) {
+      onOpenProjects()
+    }
   }
 
   const baseW = 0.35
@@ -231,7 +241,6 @@ export const Laptop: React.FC<LaptopProps> = ({
     >
       {/* 1. CNC UNIBODY LAPTOP BASE */}
       <group position={[0, 0, 0]}>
-        {/* Main Aluminum Body with Chamfered Bottom Wedge */}
         <mesh position={[0, baseH / 2, 0]} castShadow receiveShadow>
           <boxGeometry args={[baseW, baseH, baseD]} />
           <meshStandardMaterial
@@ -248,7 +257,7 @@ export const Laptop: React.FC<LaptopProps> = ({
           <meshStandardMaterial color="#171e27" roughness={0.7} flatShading />
         </mesh>
 
-        {/* Stereo Speaker Grilles (Left & Right of keyboard) */}
+        {/* Stereo Speaker Grilles */}
         {[-baseW / 2 + 0.018, baseW / 2 - 0.018].map((gx, idx) => (
           <group key={`spk-${idx}`} position={[gx, baseH + 0.0005, -0.03]}>
             {[-0.04, -0.02, 0, 0.02, 0.04].map((gz, sIdx) => (
@@ -260,7 +269,7 @@ export const Laptop: React.FC<LaptopProps> = ({
           </group>
         ))}
 
-        {/* 4 Lowpoly Rubber Feet Underneath */}
+        {/* 4 Rubber Feet */}
         {[
           [-baseW / 2 + 0.025, -baseD / 2 + 0.025],
           [baseW / 2 - 0.025, -baseD / 2 + 0.025],
@@ -273,7 +282,7 @@ export const Laptop: React.FC<LaptopProps> = ({
           </mesh>
         ))}
 
-        {/* Left Side I/O Ports */}
+        {/* Ports */}
         <mesh position={[-baseW / 2 - 0.0005, baseH / 2, -baseD / 2 + 0.04]} rotation={[0, 0, Math.PI / 2]}>
           <boxGeometry args={[0.003, 0.001, 0.008]} />
           <meshStandardMaterial color="#c29b53" metalness={0.8} roughness={0.3} flatShading />
@@ -284,14 +293,8 @@ export const Laptop: React.FC<LaptopProps> = ({
             <meshStandardMaterial color="#0c1015" metalness={0.8} roughness={0.3} flatShading />
           </mesh>
         ))}
-
-        {/* Right Side I/O Ports */}
         <mesh position={[baseW / 2 + 0.0005, baseH / 2, -baseD / 2 + 0.045]} rotation={[0, 0, Math.PI / 2]}>
           <boxGeometry args={[0.0035, 0.001, 0.012]} />
-          <meshStandardMaterial color="#0c1015" metalness={0.8} roughness={0.3} flatShading />
-        </mesh>
-        <mesh position={[baseW / 2 + 0.0005, baseH / 2, -0.065]} rotation={[0, 0, Math.PI / 2]}>
-          <boxGeometry args={[0.0025, 0.001, 0.007]} />
           <meshStandardMaterial color="#0c1015" metalness={0.8} roughness={0.3} flatShading />
         </mesh>
 
@@ -334,21 +337,16 @@ export const Laptop: React.FC<LaptopProps> = ({
               <meshStandardMaterial color="#1e2530" roughness={0.5} flatShading />
             </mesh>
           ))}
-
-          {/* Dished Spacebar */}
           <mesh position={[-0.01, 0, 0]} castShadow>
             <boxGeometry args={[0.095, 0.0025, 0.013]} />
             <meshStandardMaterial color="#d8d2c4" roughness={0.45} flatShading />
           </mesh>
-
           {[0.052, 0.074].map((kx, idx) => (
             <mesh key={`mod-r-${idx}`} position={[kx, 0, 0]} castShadow>
               <boxGeometry args={[0.018, 0.0025, 0.013]} />
               <meshStandardMaterial color="#1e2530" roughness={0.5} flatShading />
             </mesh>
           ))}
-
-          {/* Arrow Keys */}
           {[0.096, 0.112, 0.128].map((kx, idx) => (
             <mesh key={`arr-${idx}`} position={[kx, 0, 0.003]} castShadow>
               <boxGeometry args={[0.013, 0.0025, 0.007]} />
@@ -384,7 +382,6 @@ export const Laptop: React.FC<LaptopProps> = ({
           <cylinderGeometry args={[0.0045, 0.0045, 0.09, 6]} />
           <meshStandardMaterial color="#171e27" metalness={0.8} roughness={0.3} flatShading />
         </mesh>
-        {/* Brass Hinge Accents */}
         <mesh position={[-0.116, 0, 0]} rotation={[0, 0, Math.PI / 2]}>
           <cylinderGeometry args={[0.005, 0.005, 0.006, 6]} />
           <meshStandardMaterial color="#c29b53" metalness={0.8} roughness={0.3} flatShading />
@@ -412,7 +409,7 @@ export const Laptop: React.FC<LaptopProps> = ({
           <meshStandardMaterial
             color="#c29b53"
             emissive="#38bdf8"
-            emissiveIntensity={hovered || isBuilding ? 0.9 : 0.4}
+            emissiveIntensity={hovered ? 0.9 : 0.4}
             flatShading
           />
         </mesh>
@@ -424,7 +421,9 @@ export const Laptop: React.FC<LaptopProps> = ({
 
         <mesh position={[0, 0.115, 0.002]}>
           <planeGeometry args={[baseW * 0.92, 0.205]} />
-          <meshBasicMaterial map={screenTexture} toneMapped={false} />
+          <meshBasicMaterial toneMapped={false}>
+            <canvasTexture ref={textureRef} attach="map" image={canvas} />
+          </meshBasicMaterial>
         </mesh>
 
         <mesh position={[0, 0.22, 0.0022]}>

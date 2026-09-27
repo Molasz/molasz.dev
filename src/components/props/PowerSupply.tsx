@@ -1,11 +1,15 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
+import { soundFx } from '../../utils/sound'
 
 interface PowerSupplyProps {
   position?: [number, number, number]
   rotation?: [number, number, number]
   scale?: number
+  soundEnabled?: boolean
+  presetIndex?: number
+  onPresetChange?: (idx: number) => void
 }
 
 const PRESET_VOLTAGES = [
@@ -19,11 +23,30 @@ export const PowerSupply: React.FC<PowerSupplyProps> = ({
   position = [0, 0, 0],
   rotation = [0, 0, 0],
   scale = 1,
+  soundEnabled = true,
+  presetIndex: externalPreset,
+  onPresetChange,
 }) => {
-  const [presetIndex, setPresetIndex] = useState(0)
+  const [internalPreset, setInternalPreset] = useState(0)
+  const currentPreset = externalPreset !== undefined ? externalPreset : internalPreset
   const [hovered, setHovered] = useState(false)
   const knobRef = useRef<THREE.Mesh>(null)
   const currentAngle = useRef(0)
+
+  const vTextureRef = useRef<THREE.CanvasTexture>(null)
+  const aTextureRef = useRef<THREE.CanvasTexture>(null)
+
+  const { vCanvas, aCanvas } = useMemo(() => {
+    const vc = document.createElement('canvas')
+    vc.width = 128
+    vc.height = 32
+
+    const ac = document.createElement('canvas')
+    ac.width = 128
+    ac.height = 32
+
+    return { vCanvas: vc, aCanvas: ac }
+  }, [])
 
   useEffect(() => {
     document.body.style.cursor = hovered ? 'pointer' : 'auto'
@@ -33,53 +56,47 @@ export const PowerSupply: React.FC<PowerSupplyProps> = ({
   }, [hovered])
 
   useFrame(() => {
-    const target = (presetIndex * Math.PI) / 3
+    const target = (currentPreset * Math.PI) / 3
     currentAngle.current = THREE.MathUtils.lerp(currentAngle.current, target, 0.15)
     if (knobRef.current) knobRef.current.rotation.y = currentAngle.current
   })
 
-  const { vTexture, aTexture } = useMemo(() => {
-    const vc = document.createElement('canvas')
-    vc.width = 128
-    vc.height = 32
-    const vtex = new THREE.CanvasTexture(vc)
-
-    const ac = document.createElement('canvas')
-    ac.width = 128
-    ac.height = 32
-    const atex = new THREE.CanvasTexture(ac)
-
-    return { vTexture: vtex, aTexture: atex }
-  }, [])
-
   useEffect(() => {
-    const cur = PRESET_VOLTAGES[presetIndex % PRESET_VOLTAGES.length]
-    const vc = vTexture.image as HTMLCanvasElement
-    const vctx = vc.getContext('2d')
+    const cur = PRESET_VOLTAGES[currentPreset % PRESET_VOLTAGES.length]
+    const vctx = vCanvas.getContext('2d')
     if (vctx) {
       vctx.fillStyle = '#0a0d14'
       vctx.fillRect(0, 0, 128, 32)
       vctx.fillStyle = '#ea580c'
       vctx.font = 'bold 20px monospace'
       vctx.fillText(cur.v, 14, 24)
-      vTexture.needsUpdate = true
+      if (vTextureRef.current) {
+        vTextureRef.current.needsUpdate = true
+      }
     }
 
-    const ac = aTexture.image as HTMLCanvasElement
-    const actx = ac.getContext('2d')
+    const actx = aCanvas.getContext('2d')
     if (actx) {
       actx.fillStyle = '#0a0d14'
       actx.fillRect(0, 0, 128, 32)
       actx.fillStyle = '#10b981'
       actx.font = 'bold 20px monospace'
       actx.fillText(cur.a, 14, 24)
-      aTexture.needsUpdate = true
+      if (aTextureRef.current) {
+        aTextureRef.current.needsUpdate = true
+      }
     }
-  }, [presetIndex, vTexture, aTexture])
+  }, [currentPreset, vCanvas, aCanvas])
 
   const handleClick = (e: { stopPropagation: () => void }) => {
     e.stopPropagation()
-    setPresetIndex((prev) => (prev + 1) % PRESET_VOLTAGES.length)
+    const next = (currentPreset + 1) % PRESET_VOLTAGES.length
+    if (onPresetChange) {
+      onPresetChange(next)
+    } else {
+      setInternalPreset(next)
+    }
+    soundFx.switchRelay(soundEnabled)
   }
 
   const width = 0.22
@@ -98,7 +115,7 @@ export const PowerSupply: React.FC<PowerSupplyProps> = ({
       }}
       onPointerOut={() => setHovered(false)}
     >
-      {/* Parchment Stoneware Enclosure with Side Cooling Vents */}
+      {/* Parchment Stoneware Enclosure */}
       <mesh position={[0, height / 2, 0]} castShadow receiveShadow>
         <boxGeometry args={[width, height, depth]} />
         <meshStandardMaterial
@@ -132,13 +149,17 @@ export const PowerSupply: React.FC<PowerSupplyProps> = ({
       {/* Voltage Display Panel */}
       <mesh position={[0, height - 0.045, depth / 2 + 0.007]}>
         <planeGeometry args={[0.14, 0.026]} />
-        <meshBasicMaterial map={vTexture} />
+        <meshBasicMaterial toneMapped={false}>
+          <canvasTexture ref={vTextureRef} attach="map" image={vCanvas} />
+        </meshBasicMaterial>
       </mesh>
 
       {/* Current Display Panel */}
       <mesh position={[0, height - 0.082, depth / 2 + 0.007]}>
         <planeGeometry args={[0.14, 0.026]} />
-        <meshBasicMaterial map={aTexture} />
+        <meshBasicMaterial toneMapped={false}>
+          <canvasTexture ref={aTextureRef} attach="map" image={aCanvas} />
+        </meshBasicMaterial>
       </mesh>
 
       {/* CV / CC Status LEDs */}
@@ -151,7 +172,7 @@ export const PowerSupply: React.FC<PowerSupplyProps> = ({
         <meshStandardMaterial color="#ea580c" emissive="#ea580c" emissiveIntensity={0.8} />
       </mesh>
 
-      {/* Brass Knobs with Index Markings */}
+      {/* Brass Knobs */}
       <mesh
         ref={knobRef}
         position={[-0.05, 0.048, depth / 2 + 0.016]}
@@ -170,7 +191,7 @@ export const PowerSupply: React.FC<PowerSupplyProps> = ({
         <meshStandardMaterial color="#b5935b" metalness={0.8} roughness={0.3} flatShading />
       </mesh>
 
-      {/* Shrouded 5-Way Binding Posts */}
+      {/* Shrouded Binding Posts */}
       <mesh position={[-0.06, 0.02, depth / 2 + 0.016]} rotation={[Math.PI / 2, 0, 0]} castShadow>
         <cylinderGeometry args={[0.007, 0.007, 0.014, 6]} />
         <meshStandardMaterial color="#9a3412" roughness={0.4} flatShading />

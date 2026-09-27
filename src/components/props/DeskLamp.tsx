@@ -1,21 +1,28 @@
-import React, { useState, useRef, useEffect } from 'react'
+import React, { useRef, useEffect } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
+import { soundFx } from '../../utils/sound'
 
 interface DeskLampProps {
   position?: [number, number, number]
   rotation?: [number, number, number]
   scale?: number
+  isOn?: boolean
+  onToggle?: () => void
+  soundEnabled?: boolean
 }
 
 export const DeskLamp: React.FC<DeskLampProps> = ({
   position = [0, 0, 0],
   rotation = [0, 0, 0],
   scale = 1,
+  isOn = true,
+  onToggle,
+  soundEnabled = true,
 }) => {
-  const [isOn, setIsOn] = useState(true)
-  const [hovered, setHovered] = useState(false)
-  const [recoil, setRecoil] = useState(0)
+  const [hovered, setHovered] = React.useState(false)
+  const headRef = useRef<THREE.Group>(null)
+  const recoilRef = useRef(0)
 
   useEffect(() => {
     document.body.style.cursor = hovered ? 'pointer' : 'auto'
@@ -24,21 +31,20 @@ export const DeskLamp: React.FC<DeskLampProps> = ({
     }
   }, [hovered])
 
-  const headRef = useRef<THREE.Group>(null)
-  const recoilRef = useRef(0)
-
   useFrame(() => {
-    recoilRef.current = THREE.MathUtils.lerp(recoilRef.current, recoil, 0.15)
+    recoilRef.current = THREE.MathUtils.lerp(recoilRef.current, 0, 0.15)
     if (headRef.current) {
-      headRef.current.rotation.x = 1.1 + recoilRef.current * 0.1
+      headRef.current.rotation.x = 1.1 + recoilRef.current * 0.12
     }
-    if (recoil > 0) setRecoil(0)
   })
 
   const toggleLamp = (e: { stopPropagation: () => void }) => {
     e.stopPropagation()
-    setIsOn((prev) => !prev)
-    setRecoil(1)
+    recoilRef.current = 1
+    soundFx.switchRelay(soundEnabled)
+    if (onToggle) {
+      onToggle()
+    }
   }
 
   return (
@@ -90,7 +96,7 @@ export const DeskLamp: React.FC<DeskLampProps> = ({
           <meshStandardMaterial color="#2d4458" roughness={0.5} metalness={0.5} flatShading />
         </mesh>
 
-        {/* Brass Tension Spring Simulation */}
+        {/* Brass Tension Spring */}
         <mesh position={[0, 0.18, 0.008]} castShadow>
           <cylinderGeometry args={[0.004, 0.004, 0.22, 6]} />
           <meshStandardMaterial color="#b5935b" metalness={0.85} roughness={0.25} flatShading />
@@ -139,7 +145,7 @@ export const DeskLamp: React.FC<DeskLampProps> = ({
               <meshStandardMaterial
                 color={isOn ? '#fef3c7' : '#334155'}
                 emissive={isOn ? '#fef3c7' : '#000000'}
-                emissiveIntensity={isOn ? 1.2 : 0}
+                emissiveIntensity={isOn ? 1.4 : 0}
                 flatShading
               />
             </mesh>
@@ -148,8 +154,8 @@ export const DeskLamp: React.FC<DeskLampProps> = ({
             {isOn && (
               <pointLight
                 position={[0, -0.02, 0]}
-                intensity={1.4}
-                distance={2.4}
+                intensity={1.5}
+                distance={2.8}
                 color="#fde68a"
               />
             )}

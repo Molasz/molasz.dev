@@ -9,8 +9,41 @@ import { Multimeter } from '../props/Multimeter'
 import { DeskLamp } from '../props/DeskLamp'
 import { ElectronicsAndTools } from '../props/ElectronicsAndTools'
 import { PegboardTools } from '../props/PegboardTools'
+import { HelpingHands } from '../props/HelpingHands'
+import { BreadboardStation } from '../props/BreadboardStation'
+import { ComponentOrganizer } from '../props/ComponentOrganizer'
+import { TestCablesAndProbes } from '../props/TestCablesAndProbes'
+import { WallPoster } from '../props/WallPoster'
 
-export const Workbench: React.FC = () => {
+interface WorkbenchProps {
+  soundEnabled?: boolean
+  lampOn?: boolean
+  onToggleLamp?: () => void
+  onOpenProjects?: () => void
+  oscilloscopeMode?: number
+  onOscilloscopeChange?: (mode: number) => void
+  powerPreset?: number
+  onPowerPresetChange?: (preset: number) => void
+  solderingPreset?: number
+  onSolderingPresetChange?: (preset: number) => void
+  pcbActive?: boolean
+  onPcbToggle?: () => void
+}
+
+export const Workbench: React.FC<WorkbenchProps> = ({
+  soundEnabled = true,
+  lampOn = true,
+  onToggleLamp,
+  onOpenProjects,
+  oscilloscopeMode,
+  onOscilloscopeChange,
+  powerPreset,
+  onPowerPresetChange,
+  solderingPreset,
+  onSolderingPresetChange,
+  pcbActive,
+  onPcbToggle,
+}) => {
   const woodTexture = useMemo(() => getWoodTexture(), [])
   const esdTexture = useMemo(() => getEsdMatTexture(), [])
 
@@ -58,7 +91,7 @@ export const Workbench: React.FC = () => {
         </mesh>
       ))}
 
-      {/* 2. VINTAGE SLATE WORK MAT (Sitting cleanly on wood surface with zero z-fighting) */}
+      {/* 2. VINTAGE SLATE ESD WORK MAT */}
       <group position={[0, surfaceY + 0.002, 0.06]}>
         <mesh receiveShadow>
           <boxGeometry args={[1.55, 0.004, 0.72]} />
@@ -152,8 +185,14 @@ export const Workbench: React.FC = () => {
         <meshStandardMaterial color="#283340" roughness={0.8} metalness={0.2} flatShading />
       </mesh>
 
+      {/* Pegboard Wall Poster Blueprint */}
+      <WallPoster position={[-0.82, tableH + shelfH * 0.42, -tableD / 2 + 0.122]} />
+
       {/* Pegboard Tools */}
-      <PegboardTools position={[0, tableH + shelfH * 0.42, -tableD / 2 + 0.12]} />
+      <PegboardTools
+        position={[0.08, tableH + shelfH * 0.42, -tableD / 2 + 0.12]}
+        soundEnabled={soundEnabled}
+      />
 
       {/* Timber Equipment Shelf */}
       <mesh
@@ -171,7 +210,7 @@ export const Workbench: React.FC = () => {
           <boxGeometry args={[1.8, 0.05, 0.04]} />
           <meshStandardMaterial color="#d6d3cb" roughness={0.5} flatShading />
         </mesh>
-        {/* Power Switch (Muted Terracotta) */}
+        {/* Power Switch */}
         <mesh position={[-0.8, 0, 0.021]}>
           <boxGeometry args={[0.03, 0.03, 0.005]} />
           <meshStandardMaterial color="#9a3412" emissive="#9a3412" emissiveIntensity={0.6} />
@@ -181,7 +220,7 @@ export const Workbench: React.FC = () => {
           <group key={i} position={[sx, 0, 0.021]}>
             <mesh rotation={[Math.PI / 2, 0, 0]}>
               <cylinderGeometry args={[0.013, 0.013, 0.004, 6]} />
-              <meshStandardMaterial color="#1e242b" roughness={0.8} flatShading />
+              <meshStandardMaterial color="#1e2430" roughness={0.8} flatShading />
             </mesh>
             <mesh position={[0.035, 0.01, 0]}>
               <boxGeometry args={[0.004, 0.004, 0.004]} />
@@ -211,54 +250,94 @@ export const Workbench: React.FC = () => {
         </mesh>
       </group>
 
-      {/* 5. ALL INSTRUMENTS & PROPS (Cleanly spaced, zero collisions) */}
-
-      {/* UPPER SHELF INSTRUMENTS */}
+      {/* 5. INSTRUMENTS & EQUIPMENT ON UPPER SHELF */}
       <Oscilloscope
         position={[-0.45, shelfSurfaceY, -tableD / 2 + shelfD / 2 + 0.02]}
         rotation={[0, 0.12, 0]}
+        soundEnabled={soundEnabled}
+        mode={oscilloscopeMode}
+        onModeChange={onOscilloscopeChange}
       />
 
       <PowerSupply
         position={[0.08, shelfSurfaceY, -tableD / 2 + shelfD / 2 + 0.02]}
         rotation={[0, 0.02, 0]}
+        soundEnabled={soundEnabled}
+        presetIndex={powerPreset}
+        onPresetChange={onPowerPresetChange}
       />
 
-      {/* TABLETOP WORKSTATION & HARDWARE PROPS */}
-      {/* Left Workstation: Portable Terminal */}
+      <ComponentOrganizer
+        position={[0.58, shelfSurfaceY, -tableD / 2 + shelfD / 2 + 0.02]}
+        rotation={[0, -0.10, 0]}
+        soundEnabled={soundEnabled}
+      />
+
+      {/* 6. TABLETOP WORKSTATION & HARDWARE PROPS */}
+      {/* Left: Portable Terminal Laptop */}
       <Laptop
         position={[-0.68, surfaceY, 0.08]}
         rotation={[0, 0.22, 0]}
+        soundEnabled={soundEnabled}
+        onOpenProjects={onOpenProjects}
       />
 
       {/* Center-Left: Mechanical Keyboard & Ergonomic Mouse */}
       <KeyboardMouse
         position={[-0.06, matSurfaceY, 0.25]}
         rotation={[0, 0.02, 0]}
+        soundEnabled={soundEnabled}
       />
 
       {/* Center: Prototype PCB Board */}
       <ElectronicsAndTools
-        position={[0, matSurfaceY, -0.06]}
+        position={[-0.10, matSurfaceY, -0.06]}
+        soundEnabled={soundEnabled}
+        pcbActive={pcbActive}
+        onPcbToggle={onPcbToggle}
+      />
+
+      {/* Center: Solderless Breadboard Station with LEDs & IC */}
+      <BreadboardStation
+        position={[0.12, matSurfaceY, -0.06]}
+        rotation={[0, -0.05, 0]}
+        soundEnabled={soundEnabled}
       />
 
       {/* Center-Right: Multimeter */}
       <Multimeter
-        position={[0.34, matSurfaceY, -0.06]}
+        position={[0.38, matSurfaceY, -0.06]}
         rotation={[0, -0.28, 0]}
+        soundEnabled={soundEnabled}
+      />
+
+      {/* Right Bay: Helping Hands */}
+      <HelpingHands
+        position={[0.62, surfaceY, 0.16]}
+        rotation={[0, -0.35, 0]}
+        soundEnabled={soundEnabled}
       />
 
       {/* Right Bay: Soldering Station */}
       <SolderingStation
         position={[0.74, surfaceY, -0.10]}
         rotation={[0, -0.22, 0]}
+        soundEnabled={soundEnabled}
+        tempIndex={solderingPreset}
+        onTempChange={onSolderingPresetChange}
       />
 
       {/* Right Rear: Articulated Desk Lamp */}
       <DeskLamp
         position={[tableW / 2 - 0.16, surfaceY, -tableD / 2 + 0.16]}
         rotation={[0, -0.5, 0]}
+        isOn={lampOn}
+        onToggle={onToggleLamp}
+        soundEnabled={soundEnabled}
       />
+
+      {/* Real Interconnecting Patch Cables & Scope Probes */}
+      <TestCablesAndProbes />
     </group>
   )
 }
